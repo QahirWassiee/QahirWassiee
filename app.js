@@ -4,13 +4,15 @@
   const API = "https://api.quran.com/api/v4";
   const ALQURAN = "https://api.alquran.cloud/v1";
   const AUDIO_BASE = "https://everyayah.com/data";
-  const GLYPH_FONT = (p) => `https://static.qurancdn.com/fonts/quran/hafs/v2/woff2/p${p}.woff2`;
+  const QCF = "https://cdn.jsdelivr.net/npm/quran-qcf4@1.1.0";
+  const HEADER_FONT = "QCF4_QBSML";
   const TOTAL_PAGES = 604;
   const LINES_PER_PAGE = 15;
-  const PAGE_RATIO = 0.64; // width / height
+  const MAX_PAGE_RATIO = 0.68; // width / height on wide screens
+  const MIN_PAGE_RATIO = 0.5; // narrowest a page may get on tall phone screens
   const BISMILLAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
 
-  const { SURAHS, JUZ, RECITERS, DEFAULT_TRANSLATIONS } = window;
+  const { SURAHS, JUZ, RECITERS, DEFAULT_TRANSLATIONS, PAGE_FIRST_VERSE } = window;
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -39,13 +41,14 @@
   const settings = Object.assign({
     theme: "light",
     layout: "auto",
-    fs: 100,
-    script: "text",
+    script: "glyph",
     reciter: RECITERS[0][0],
     translation: DEFAULT_TRANSLATIONS[0][0],
     autoAdvance: true,
   }, store.get("settings", {}));
   const saveSettings = () => store.set("settings", settings);
+  // Earlier versions defaulted to plain text; move everyone to the Madani glyphs once.
+  if (!settings.qcf4) { settings.script = "glyph"; settings.qcf4 = true; delete settings.fs; saveSettings(); }
 
   let bookmarks = store.get("bookmarks", []);
   const saveBookmarks = () => store.set("bookmarks", bookmarks);
@@ -72,7 +75,10 @@
   };
 
   // ---------- data loading ----------
+  // Page layout and glyph fonts: KFGQPC QCF4 (Madinah Mushaf 1441H) via the quran-qcf4 package.
   const pageCache = new Map();
+  const translationCache = new Map();
+  const fontCache = new Map();
 
   async function fetchJSON(url) {
     const res = await fetch(url);
@@ -80,53 +86,53 @@
     return res.json();
   }
 
-  function loadPage(p) {
-    const cacheKey = `${p}|${settings.translation}`;
-    if (!pageCache.has(cacheKey)) {
-      const promise = (async () => {
-        const verses = [];
-        let next = 1;
-        while (next) {
-          const url = `${API}/verses/by_page/${p}?words=true` +
-            `&word_fields=text_uthmani,code_v2,line_number,page_number` +
-            `&fields=text_uthmani,page_number,juz_number` +
-            `&translations=${settings.translation}&per_page=50&page=${next}`;
-          const data = await fetchJSON(url);
-          verses.push(...data.verses);
-          next = data.pagination && data.pagination.next_page;
-        }
-        return verses;
-      })();
-      promise.catch(() => pageCache.delete(cacheKey));
-      pageCache.set(cacheKey, promise);
+  function cached(map, key, load) {
+    if (!map.has(key)) {
+      const promise = load();
+      promise.catch(() => map.delete(key));
+      map.set(key, promise);
     }
-    return pageCache.get(cacheKey);
+    return map.get(key);
   }
 
-  const glyphFonts = new Map();
-  function loadGlyphFont(p) {
-    if (!glyphFonts.has(p)) {
-      const face = new FontFace(`qcf-p${p}`, `url(${GLYPH_FONT(p)})`, { display: "block" });
-      const promise = face.load().then((f) => { document.fonts.add(f); return true; }, () => false);
-      glyphFonts.set(p, promise);
-    }
-    return glyphFonts.get(p);
-  }
+  const loadPage = (p) => cached(pageCache, p, () => fetchJSON(`${QCF}/pages/${pad3(p)}.json`));
 
-  async function findVersePage(key) {
-    try {
-      const data = await fetchJSON(`${API}/verses/by_key/${key}?fields=page_number`);
-      if (data.verse && data.verse.page_number) return data.verse.page_number;
-    } catch { /* fall through to the secondary API */ }
-    const data = await fetchJSON(`${ALQURAN}/ayah/${key}`);
-    if (!data.data || !data.data.page) throw new Error("Verse not found");
-    return data.data.page;
+  const loadFont = (name) => cached(fontCache, name, () => {
+    const file = name === HEADER_FONT ? name : `${name}_W`;
+    const face = new FontFace(name, `url(${QCF}/fonts-woff2/${file}.woff2)`, { display: "block" });
+    return face.load().then((f) => { document.fonts.add(f); });
+  });
+
+  // Uthmani text and the selected translation for one page, from quran.com.
+  const loadTranslations = (p) => cached(translationCache, `${p}|${settings.translation}`, async () => {
+    const out = new Map();
+    let next = 1;
+    while (next) {
+      const data = await fetchJSON(`${API}/verses/by_page/${p}?fields=text_uthmani` +
+        `&translations=${settings.translation}&per_page=50&page=${next}`);
+      data.verses.forEach((v) => out.set(v.verse_key, v));
+      next = data.pagination && data.pagination.next_page;
+    }
+    return out;
+  });
+
+  const compareKeys = (a, b) => {
+    const [s1, a1] = splitKey(a), [s2, a2] = splitKey(b);
+    return s1 - s2 || a1 - a2;
+  };
+  function pageForVerse(key) {
+    let lo = 0, hi = PAGE_FIRST_VERSE.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (compareKeys(PAGE_FIRST_VERSE[mid], key) <= 0) lo = mid; else hi = mid - 1;
+    }
+    return lo + 1;
   }
 
   // ---------- state ----------
   let currentPage = clampPage(parseInt(location.hash.slice(1), 10) || store.get("lastPage", 1));
   let visiblePages = [];
-  const verseIndex = new Map(); // verse key -> verse object for visible pages
+  const verseText = new Map(); // verse key -> Arabic text, for visible pages
   let renderToken = 0;
 
   const isDouble = () => {
@@ -153,11 +159,35 @@
     document.querySelectorAll(".nav-arrow").forEach((a) => {
       if (getComputedStyle(a).display !== "none") w -= a.offsetWidth + 8;
     });
-    const pw = Math.min(w / pages.length, h * PAGE_RATIO);
+    // Pages keep a book-like shape on wide screens and stretch to fill a phone screen.
+    const pw = Math.floor(Math.min(w / pages.length, h * MAX_PAGE_RATIO));
+    const ph = Math.floor(Math.min(h, pw / MIN_PAGE_RATIO));
     pages.forEach((pg) => {
-      pg.style.width = `${Math.floor(pw)}px`;
-      pg.style.height = `${Math.floor(pw / PAGE_RATIO)}px`;
+      pg.style.width = `${pw}px`;
+      pg.style.height = `${ph}px`;
     });
+    pages.forEach(fitPage);
+  }
+
+  // Scale the text so the widest line exactly fills the page, as in the printed mushaf.
+  function fitPage(pg) {
+    const lines = pg.querySelector(".lines");
+    if (!lines) return;
+    const base = 20;
+    lines.style.fontSize = `${base}px`;
+    const rows = [...lines.querySelectorAll(".line")];
+    let widest = 0;
+    rows.forEach((row) => {
+      const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+      const kids = [...row.children];
+      const width = kids.reduce((n, k) => n + k.getBoundingClientRect().width, 0) + gap * Math.max(0, kids.length - 1);
+      widest = Math.max(widest, width);
+    });
+    if (!widest) return;
+    const count = pg.classList.contains("short") ? rows.length + 4 : LINES_PER_PAGE;
+    const byWidth = base * (lines.clientWidth / widest) * 0.99;
+    const byHeight = lines.clientHeight / (count * 1.32);
+    lines.style.fontSize = `${Math.min(byWidth, byHeight).toFixed(2)}px`;
   }
 
   function pageShell(p) {
@@ -166,101 +196,80 @@
     const head = el("div", "page-head");
     head.append(el("span", "head-surah", "سورة " + SURAHS[surahForPage(p) - 1][0]),
       el("span", "head-juz", "الجزء " + arabicDigits(juzForPage(p))));
-    const body = el("div", "page-loading");
-    body.append(el("div", "spinner"));
     const foot = el("div", "page-foot");
     foot.append(el("span", "page-num", arabicDigits(p)));
-    page.append(head, body, foot);
+    page.append(head, spinnerBox(), foot);
     return page;
   }
+  const spinnerBox = () => { const b = el("div", "page-loading"); b.append(el("div", "spinner")); return b; };
 
-  function surahHeader(s) {
-    return el("div", "surah-header", "سورة " + SURAHS[s - 1][0]);
+  function buildLines(data, glyph) {
+    const frag = document.createDocumentFragment();
+    data.lines.forEach((line) => {
+      const header = line.words.find((w) => w.type === "surah_header");
+      if (header) {
+        const box = el("div", "surah-header");
+        const name = el("span", "surah-name", glyph ? header.char : "سورة " + SURAHS[header.sura - 1][0]);
+        if (glyph) name.style.fontFamily = header.font;
+        box.append(name);
+        frag.append(box);
+        return;
+      }
+      const bism = line.words.find((w) => w.type === "bismillah");
+      if (bism) {
+        const b = el("div", "bismillah", glyph ? bism.char : BISMILLAH);
+        if (glyph) b.style.fontFamily = bism.font;
+        frag.append(b);
+        return;
+      }
+      const row = el("div", "line");
+      line.words.forEach((w) => {
+        const span = el("span", "word" + (w.type === "end" ? " end" : w.type === "quarter" ? " quarter" : ""));
+        if (w.verse_key) span.dataset.key = w.verse_key;
+        if (glyph) {
+          span.textContent = w.char;
+          span.style.fontFamily = w.font;
+        } else if (w.type === "end") {
+          span.textContent = arabicDigits(splitKey(w.verse_key)[1]);
+        } else {
+          span.textContent = w.type === "quarter" ? "۞" : w.text;
+        }
+        row.append(span);
+      });
+      frag.append(row);
+    });
+    return frag;
   }
 
-  function buildLines(p, verses, glyph) {
-    const byLine = new Map();
-    verses.forEach((v) => {
-      v.words.forEach((w) => {
-        if (w.page_number && w.page_number !== p) return;
-        if (!byLine.has(w.line_number)) byLine.set(w.line_number, []);
-        byLine.get(w.line_number).push({ w, v });
-      });
-    });
-
-    const short = p <= 2;
-    const slots = [];
-    for (let l = 1; l <= LINES_PER_PAGE; l++) slots.push(byLine.has(l) ? { line: byLine.get(l) } : { gap: true });
-
-    // Gaps are where surah headers and the basmala sit in the printed mushaf.
-    const lastVerse = verses[verses.length - 1];
-    const out = [];
-    for (let i = 0; i < slots.length;) {
-      if (!slots[i].gap) { out.push(slots[i]); i++; continue; }
-      let j = i;
-      while (j < slots.length && slots[j].gap) j++;
-      const gapLen = j - i;
-      let surah = null;
-      if (j < slots.length) {
-        const first = slots[j].line[0];
-        if (first.v.verse_number === 1 && first.w.position === 1) surah = first.v.chapter_id || splitKey(first.v.verse_key)[0];
-      } else if (lastVerse && !short && p < TOTAL_PAGES) {
-        const [s, a] = splitKey(lastVerse.verse_key);
-        if (a === SURAHS[s - 1][3] && s < 114) surah = s + 1;
-      }
-      if (surah) {
-        out.push({ header: surah });
-        if (gapLen >= 2 && surah !== 1 && surah !== 9) out.push({ bismillah: true });
-        for (let k = (gapLen >= 2 && surah !== 1 && surah !== 9) ? 2 : 1; k < gapLen && !short; k++) out.push({ spacer: true });
-      } else if (!short) {
-        for (let k = 0; k < gapLen; k++) out.push({ spacer: true });
-      }
-      i = j;
-    }
-
-    const textOf = (x) => (glyph ? x.w.code_v2 : x.w.text_uthmani) || "";
-    const lengths = out.filter((o) => o.line).map((o) => o.line.reduce((n, x) => n + textOf(x).length, 0));
-    const maxLen = Math.max(1, ...lengths);
-
-    const frag = document.createDocumentFragment();
-    out.forEach((o, idx) => {
-      if (o.header) { frag.append(surahHeader(o.header)); return; }
-      if (o.bismillah) { frag.append(el("div", "bismillah", BISMILLAH)); return; }
-      if (o.spacer) { frag.append(el("div", "line")); return; }
-      const line = el("div", "line");
-      if (glyph) line.style.fontFamily = `qcf-p${p}`;
-      const len = o.line.reduce((n, x) => n + textOf(x).length, 0);
-      const nextIsBreak = !out[idx + 1] || out[idx + 1].header || out[idx + 1].spacer;
-      if (short || (len < maxLen * 0.7 && nextIsBreak)) line.classList.add("center");
-      o.line.forEach(({ w, v }) => {
-        const isEnd = w.char_type_name === "end";
-        const span = el("span", "word" + (isEnd ? " end" : ""));
-        span.dataset.key = v.verse_key;
-        span.textContent = glyph ? w.code_v2 : (isEnd ? arabicDigits(v.verse_number) : w.text_uthmani);
-        line.append(span);
-      });
-      frag.append(line);
-    });
-    return { frag, short };
+  function indexVerseText(data) {
+    const words = new Map();
+    data.lines.forEach((l) => l.words.forEach((w) => {
+      if (w.type !== "word" || !w.verse_key) return;
+      if (!words.has(w.verse_key)) words.set(w.verse_key, []);
+      words.get(w.verse_key).push(w.text);
+    }));
+    words.forEach((list, key) => verseText.set(key, list.join(" ")));
   }
 
   async function renderPage(p, pageEl, token) {
     try {
-      const verses = await loadPage(p);
+      const data = await loadPage(p);
       let glyph = settings.script === "glyph";
-      if (glyph) glyph = await loadGlyphFont(p);
-      if (token !== renderToken) return;
-      verses.forEach((v) => verseIndex.set(v.verse_key, v));
-      const { frag, short } = buildLines(p, verses, glyph);
-      const lines = el("div", "lines");
-      lines.append(frag);
-      pageEl.classList.toggle("short", short);
-      pageEl.classList.toggle("glyph", glyph);
-      if (verses[0]) {
-        pageEl.querySelector(".head-surah").textContent = "سورة " + SURAHS[splitKey(verses[0].verse_key)[0] - 1][0];
-        if (verses[0].juz_number) pageEl.querySelector(".head-juz").textContent = "الجزء " + arabicDigits(verses[0].juz_number);
+      if (glyph) {
+        const fonts = new Set();
+        data.lines.forEach((l) => l.words.forEach((w) => fonts.add(w.font)));
+        glyph = await Promise.all([...fonts].map(loadFont)).then(() => true, () => false);
       }
+      if (token !== renderToken) return;
+      indexVerseText(data);
+      const lines = el("div", "lines");
+      lines.append(buildLines(data, glyph));
+      pageEl.classList.toggle("short", data.lines.length < LINES_PER_PAGE);
+      pageEl.classList.toggle("glyph", glyph);
+      if (data.surahs && data.surahs[0]) pageEl.querySelector(".head-surah").textContent = "سورة " + SURAHS[data.surahs[0].id - 1][0];
       pageEl.children[1].replaceWith(lines);
+      fitPage(pageEl);
+      if (!glyph) document.fonts.ready.then(() => fitPage(pageEl));
       if (playingKey) markPlaying(playingKey);
     } catch (err) {
       if (token !== renderToken) return;
@@ -274,12 +283,11 @@
       pageEl.children[1].replaceWith(box);
     }
   }
-  const spinnerBox = () => { const b = el("div", "page-loading"); b.append(el("div", "spinner")); return b; };
 
   function render() {
     const token = ++renderToken;
     visiblePages = spreadPages(currentPage);
-    verseIndex.clear();
+    verseText.clear();
     const spread = $("spread");
     spread.classList.toggle("double", visiblePages.length > 1 || isDouble());
     spread.replaceChildren(...visiblePages.map(pageShell));
@@ -316,15 +324,11 @@
   const prevPage = () => { const first = visiblePages[0]; if (first > 1) return goTo(first - step()); };
 
   async function goToVerse(key) {
-    try {
-      const p = await findVersePage(key);
-      if (!visiblePages.includes(p)) await goTo(p);
-      document.querySelectorAll(`.word[data-key="${key}"]`).forEach((w) => {
-        w.classList.remove("flash"); void w.offsetWidth; w.classList.add("flash");
-      });
-    } catch {
-      toast("Couldn't find that verse");
-    }
+    const p = pageForVerse(key);
+    if (!visiblePages.includes(p)) await goTo(p);
+    document.querySelectorAll(`.word[data-key="${key}"]`).forEach((w) => {
+      w.classList.remove("flash"); void w.offsetWidth; w.classList.add("flash");
+    });
   }
 
   // ---------- audio ----------
@@ -408,15 +412,21 @@
     return tpl.content.textContent.trim();
   }
   function openPopover(key) {
-    const v = verseIndex.get(key);
-    if (!v) return;
     popKey = key;
     document.querySelectorAll(".word.selected").forEach((w) => w.classList.remove("selected"));
     document.querySelectorAll(`.word[data-key="${key}"]`).forEach((w) => w.classList.add("selected"));
     $("popKey").textContent = verseLabel(key);
-    $("popArabic").textContent = v.text_uthmani;
-    const tr = v.translations && v.translations[0];
-    $("popTrans").textContent = tr ? cleanTranslation(tr.text) : "";
+    $("popArabic").textContent = verseText.get(key) || "";
+    $("popTrans").textContent = "Loading translation…";
+    loadTranslations(pageForVerse(key)).then((verses) => {
+      if (popKey !== key) return;
+      const v = verses.get(key);
+      if (v && v.text_uthmani) $("popArabic").textContent = v.text_uthmani;
+      const tr = v && v.translations && v.translations[0];
+      $("popTrans").textContent = tr ? cleanTranslation(tr.text) : "";
+    }, () => {
+      if (popKey === key) $("popTrans").textContent = "Translation unavailable right now.";
+    });
     $("popBookmark").classList.toggle("active", bookmarks.some((b) => b.key === key));
     $("popover").classList.add("open");
     $("popover").setAttribute("aria-hidden", "false");
@@ -445,8 +455,7 @@
     const i = bookmarks.findIndex((b) => b.key === key);
     if (i >= 0) { bookmarks.splice(i, 1); toast("Bookmark removed"); }
     else {
-      const v = verseIndex.get(key);
-      bookmarks.unshift({ key, page: (v && v.page_number) || visiblePages[0], time: Date.now() });
+      bookmarks.unshift({ key, page: pageForVerse(key), time: Date.now() });
       toast(`${verseLabel(key)} bookmarked`);
     }
     saveBookmarks();
@@ -622,7 +631,6 @@
     const meta = document.querySelector('meta[name="theme-color"]');
     meta.content = settings.theme === "dark" ? "#182019" : settings.theme === "sepia" ? "#8a5a1e" : "#1f5f4a";
   }
-  function applyFontSize() { document.documentElement.style.setProperty("--fs", settings.fs / 100); }
 
   function fillSelect(sel, options, value) {
     sel.replaceChildren(...options.map(([v, label]) => {
@@ -646,14 +654,13 @@
   function initSettings() {
     const scriptSel = el("select");
     scriptSel.id = "scriptSel";
-    fillSelect(scriptSel, [["text", "Uthmani text"], ["glyph", "Madani page glyphs (QCF)"]], settings.script);
+    fillSelect(scriptSel, [["glyph", "Madani Mushaf (King Fahd Complex)"], ["text", "Uthmani text (Amiri)"]], settings.script);
     const scriptLabel = el("label", null, "Script");
     scriptLabel.append(scriptSel);
     $("layoutSel").closest("label").after(scriptLabel);
 
     $("themeSel").value = settings.theme;
     $("layoutSel").value = settings.layout;
-    $("fontSize").value = settings.fs;
     $("autoAdvance").checked = settings.autoAdvance;
     fillSelect($("reciterSel"), RECITERS, settings.reciter);
     fillSelect($("translationSel"), DEFAULT_TRANSLATIONS, settings.translation);
@@ -662,13 +669,12 @@
     $("themeSel").addEventListener("change", (e) => { settings.theme = e.target.value; saveSettings(); applyTheme(); });
     $("layoutSel").addEventListener("change", (e) => { settings.layout = e.target.value; saveSettings(); render(); });
     scriptSel.addEventListener("change", (e) => { settings.script = e.target.value; saveSettings(); render(); });
-    $("fontSize").addEventListener("input", (e) => { settings.fs = +e.target.value; saveSettings(); applyFontSize(); });
     $("autoAdvance").addEventListener("change", (e) => { settings.autoAdvance = e.target.checked; saveSettings(); });
     $("reciterSel").addEventListener("change", (e) => {
       settings.reciter = e.target.value; saveSettings();
       if (playingKey && !audio.paused) playVerse(playingKey);
     });
-    $("translationSel").addEventListener("change", (e) => { settings.translation = +e.target.value; saveSettings(); render(); });
+    $("translationSel").addEventListener("change", (e) => { settings.translation = +e.target.value; saveSettings(); });
   }
 
   // ---------- misc ----------
@@ -779,7 +785,6 @@
 
   // ---------- boot ----------
   applyTheme();
-  applyFontSize();
   initSettings();
   bindEvents();
   goTo(currentPage);

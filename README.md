@@ -4,7 +4,7 @@ A web app for reading the Quran page by page in the 604-page Madani Mushaf layou
 
 ## Features
 
-- **Mushaf page view:** each page has 15 lines laid out as in the printed Madani Mushaf. Surah headers, the basmala, juz and surah running heads, and page numbers are included.
+- **Mushaf page view:** pages use the King Fahd Complex Madinah Mushaf lettering (QCF4, 1441H). Each page has the same 15 lines as the printed copy, with ornate ayah markers, surah title banners, the basmala, juz and surah running heads, and page numbers. The text is scaled so every line fills the page width.
 - **Two-page spread:** on wide screens the right (odd) and left pages show side by side, like an open book. Phones show one page at a time.
 - **Navigation:**
   - an index of all 114 surahs and 30 juz
@@ -18,7 +18,7 @@ A web app for reading the Quran page by page in the 604-page Madani Mushaf layou
 - **Translations:** any translation on quran.com, chosen in Settings.
 - **Search:** English or Arabic text, surah names, page numbers, or verse references such as `2:255`.
 - **Bookmarks and last read:** saved locally in the browser.
-- **Themes:** Classic, Sepia and Night, plus a font-size slider. You can choose Uthmani text or the Madani QCF page glyphs.
+- **Themes:** Classic, Sepia and Night. Settings can also switch the page to plain Uthmani text in the Amiri font.
 - **Installable PWA:** pages you have opened stay available offline.
 
 ## Running locally
@@ -40,13 +40,15 @@ Upload the files to any static host (GitHub Pages, Netlify, Vercel, Cloudflare P
 
 | What | Source |
 | --- | --- |
-| Quran text, line layout, translations | [Quran.com API v4](https://api-docs.quran.com/) |
+| Mushaf page layout and glyph fonts | [quran-qcf4](https://github.com/MohamadHajjRabee/quran-qcf4), loaded from jsDelivr |
+| Translations and Uthmani text | [Quran.com API v4](https://api-docs.quran.com/) |
 | Text search | [AlQuran.cloud API](https://alquran.cloud/api) |
 | Recitation audio | [EveryAyah.com](https://everyayah.com/) |
-| Page glyph fonts (optional) | Quran.com CDN (KFGQPC QCF V2) |
-| Fonts | Amiri / Amiri Quran (Google Fonts) |
+| UI fonts | Amiri / Amiri Quran / Inter (Google Fonts) |
 
-Surah, juz and page metadata are built into `data.js`.
+Surah, juz and page metadata, and the first verse on each page, are built into `data.js`.
+
+The QCF4 Mushaf fonts are © King Fahd Glorious Qur'an Printing Complex and are not open source. They are loaded at runtime from the published npm package and are deliberately not copied into this repository.
 
 ## Files
 

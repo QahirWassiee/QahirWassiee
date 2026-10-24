@@ -12,7 +12,6 @@
   --selected: rgba(31, 95, 74, 0.18);
   --shadow: 0 6px 24px rgba(60, 45, 20, 0.14);
   --bar: rgba(255, 253, 246, 0.92);
-  --fs: 1;
   --quran-font: "Amiri Quran", "KFGQPC Uthmanic Script HAFS", "Amiri", serif;
   --ui-font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: light;
@@ -179,28 +178,26 @@ button { font: inherit; color: inherit; }
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 1cqw 0;
+  padding: 4.5cqw 0 0.6cqw;
   direction: rtl;
   min-height: 0;
+  font-size: 20px; /* replaced by fitPage() so the widest line fills the page */
 }
-.page.short .lines { justify-content: center; gap: 1.6cqw; }
+.page.short .lines { justify-content: center; gap: 0.55em; }
 .line {
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-family: var(--quran-font);
-  font-size: calc(5.15cqw * var(--fs));
-  line-height: 1.6;
+  line-height: 1.32;
   white-space: nowrap;
-  min-height: 0;
 }
-.line.center { justify-content: center; gap: 0.32em; }
-.page.glyph .line { font-size: calc(5.6cqw * var(--fs)); line-height: 1.5; }
+.page:not(.glyph) .line { gap: 0.28em; }
+.page.short .line { justify-content: center; gap: 0.3em; }
 
 .word {
   cursor: pointer;
-  border-radius: 0.2em;
-  padding: 0 0.04em;
+  border-radius: 0.18em;
   transition: background-color 0.15s;
 }
 .word:hover, .word.hover { background: var(--hover); }
@@ -208,41 +205,38 @@ button { font: inherit; color: inherit; }
 .word.playing { background: var(--playing); }
 .word.flash { animation: flash 1.6s ease-out 2; }
 @keyframes flash { 0%, 100% { background: transparent; } 40% { background: var(--playing); } }
-.word.end {
+.page:not(.glyph) .word.end {
   display: inline-grid; place-items: center;
   min-width: 1.5em; height: 1.5em; padding: 0 0.15em;
   font-family: "Amiri", serif; font-size: 0.62em; line-height: 1;
   color: var(--accent);
   border: 0.09em solid var(--gold); border-radius: 50%;
   box-shadow: 0 0 0 0.12em var(--paper), 0 0 0 0.19em var(--gold);
-  margin: 0 0.15em;
 }
-.page.glyph .word.end {
-  display: inline; min-width: 0; height: auto; padding: 0 0.04em; margin: 0;
-  font-family: inherit; font-size: inherit; line-height: inherit;
-  color: inherit; border: 0; box-shadow: none; border-radius: 0.2em;
-}
+.page:not(.glyph) .word.quarter { color: var(--gold); }
 
 .surah-header {
   display: grid; place-items: center;
+  height: 1.8em;
+  margin: 0 0.4em;
   font-family: "Amiri", serif;
-  font-size: calc(4.6cqw * var(--fs));
-  height: 9cqw;
-  margin: 0 2cqw;
   color: var(--accent);
-  border: 1.5px solid var(--gold);
-  border-radius: 1cqw;
+  border: 0.06em solid var(--gold);
+  border-radius: 0.25em;
+  box-shadow: inset 0 0 0 0.1em var(--paper), inset 0 0 0 0.14em var(--gold);
   background:
-    radial-gradient(circle at 0 50%, var(--gold) 0 1.2cqw, transparent 1.3cqw),
-    radial-gradient(circle at 100% 50%, var(--gold) 0 1.2cqw, transparent 1.3cqw),
+    radial-gradient(circle at 0 50%, var(--gold) 0 0.22em, transparent 0.24em),
+    radial-gradient(circle at 100% 50%, var(--gold) 0 0.22em, transparent 0.24em),
     linear-gradient(var(--hover), var(--hover));
 }
+.surah-name { font-size: 0.95em; line-height: 1; }
+.page.glyph .surah-name { font-size: 1.05em; line-height: 1.6; color: var(--ink); }
 .bismillah {
   text-align: center;
   font-family: "Amiri Quran", "Amiri", serif;
-  font-size: calc(5cqw * var(--fs));
-  line-height: 1.6;
+  line-height: 1.32;
 }
+.page.glyph .bismillah { font-size: 1.05em; }
 
 .page-loading, .page-error {
   flex: 1; display: grid; place-items: center; text-align: center;
@@ -352,6 +346,7 @@ button { font: inherit; color: inherit; }
 @media (max-width: 640px) {
   .reader { padding: 6px; }
   .nav-arrow { display: none; }
-  .page { height: auto; width: 100%; max-height: 100%; }
+  .page { padding: 2.5cqw 3.5cqw 1.5cqw; }
+  .page::before { display: none; }
   .goto span { display: none; }
 }
