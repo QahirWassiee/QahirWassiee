@@ -1,0 +1,13 @@
+{
+  "name": "Mushaf Quran",
+  "short_name": "Mushaf",
+  "description": "Read the Holy Quran page by page in the Madani Mushaf layout.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#efe9dc",
+  "theme_color": "#1f5f4a",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Mushaf Quran</title>
+  <meta name="description" content="Read the Holy Quran page by page in the Madani Mushaf layout, with recitation, translation, bookmarks and search.">
+  <meta name="theme-color" content="#1f5f4a">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Amiri:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <button class="icon-btn" id="menuBtn" aria-label="Open index" title="Index">
+      <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <div class="topbar-title">
+      <div id="surahTitle" class="surah-title">الفاتحة</div>
+      <div id="pageMeta" class="page-meta">Page 1 · Juz 1</div>
+    </div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="searchBtn" aria-label="Search" title="Search">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+      </button>
+      <button class="icon-btn" id="bookmarkBtn" aria-label="Bookmark page" title="Bookmark page">
+        <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>
+      </button>
+      <button class="icon-btn" id="settingsBtn" aria-label="Settings" title="Settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="reader" id="reader">
+    <button class="nav-arrow nav-next" id="nextBtn" aria-label="Next page" title="Next page (←)">
+      <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
+    <div class="spread" id="spread"></div>
+    <button class="nav-arrow nav-prev" id="prevBtn" aria-label="Previous page" title="Previous page (→)">
+      <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+  </main>
+
+  <footer class="bottombar">
+    <button class="icon-btn" id="playBtn" aria-label="Play recitation" title="Play page recitation">
+      <svg viewBox="0 0 24 24" class="ico-play"><path d="M7 4l13 8-13 8z"/></svg>
+      <svg viewBox="0 0 24 24" class="ico-pause"><path d="M7 4h4v16H7zM13 4h4v16h-4z"/></svg>
+    </button>
+    <div class="audio-info" id="audioInfo">Tap an ayah or press play</div>
+    <form class="goto" id="gotoForm">
+      <label for="gotoInput" class="sr-only">Go to page</label>
+      <input id="gotoInput" type="number" min="1" max="604" inputmode="numeric" placeholder="Page">
+      <span>/ 604</span>
+    </form>
+  </footer>
+
+  <!-- Index drawer -->
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-head">
+      <div class="tabs" role="tablist">
+        <button role="tab" class="tab active" data-tab="surahs">Surah</button>
+        <button role="tab" class="tab" data-tab="juz">Juz</button>
+        <button role="tab" class="tab" data-tab="bookmarks">Bookmarks</button>
+      </div>
+      <button class="icon-btn" data-close aria-label="Close">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <input class="filter" id="surahFilter" type="search" placeholder="Filter surahs…">
+    <ul class="list" id="indexList"></ul>
+  </aside>
+
+  <!-- Search panel -->
+  <aside class="drawer drawer-right" id="searchPanel" aria-hidden="true">
+    <div class="drawer-head">
+      <strong>Search</strong>
+      <button class="icon-btn" data-close aria-label="Close">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <form id="searchForm" class="search-form">
+      <input id="searchInput" type="search" placeholder="Search Arabic or English, or 2:255" autocomplete="off">
+    </form>
+    <ul class="list" id="searchResults"></ul>
+  </aside>
+
+  <!-- Settings panel -->
+  <aside class="drawer drawer-right" id="settingsPanel" aria-hidden="true">
+    <div class="drawer-head">
+      <strong>Settings</strong>
+      <button class="icon-btn" data-close aria-label="Close">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="settings">
+      <label>Theme
+        <select id="themeSel">
+          <option value="light">Classic</option>
+          <option value="sepia">Sepia</option>
+          <option value="dark">Night</option>
+        </select>
+      </label>
+      <label>Layout
+        <select id="layoutSel">
+          <option value="auto">Auto (two pages on wide screens)</option>
+          <option value="single">Single page</option>
+          <option value="double">Two-page spread</option>
+        </select>
+      </label>
+      <label>Font size
+        <input id="fontSize" type="range" min="80" max="140" step="5">
+      </label>
+      <label>Reciter
+        <select id="reciterSel"></select>
+      </label>
+      <label>Translation
+        <select id="translationSel"></select>
+      </label>
+      <label class="check"><input type="checkbox" id="autoAdvance"> Continue to next page while playing</label>
+      <p class="hint">Keyboard: ← / → turn pages, Space plays, B bookmarks, / searches.</p>
+    </div>
+  </aside>
+
+  <!-- Ayah popover -->
+  <div class="popover" id="popover" role="dialog" aria-hidden="true">
+    <div class="pop-head">
+      <span id="popKey"></span>
+      <div class="pop-actions">
+        <button class="icon-btn" id="popPlay" aria-label="Play ayah" title="Play from this ayah">
+          <svg viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg>
+        </button>
+        <button class="icon-btn" id="popBookmark" aria-label="Bookmark ayah" title="Bookmark ayah">
+          <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>
+        </button>
+        <button class="icon-btn" id="popCopy" aria-label="Copy ayah" title="Copy">
+          <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>
+        </button>
+        <button class="icon-btn" data-close aria-label="Close">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="pop-arabic" id="popArabic" lang="ar" dir="rtl"></div>
+    <div class="pop-trans" id="popTrans"></div>
+  </div>
+
+  <div class="scrim" id="scrim"></div>
+  <div class="toast" id="toast" role="status"></div>
+  <audio id="audio" preload="auto"></audio>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
