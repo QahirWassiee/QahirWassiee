@@ -4,124 +4,183 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Mushaf Quran</title>
-  <meta name="description" content="Read the Holy Quran in the Madinah Mushaf or verse by verse, track your khatam, and listen to recitations.">
-  <meta name="theme-color" content="#2f5b3d">
+  <meta name="description" content="Read the Holy Quran in the Madinah Mushaf or verse by verse, track your reading, and listen to recitations.">
+  <meta name="theme-color" content="#f2f4f7">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Amiri:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Amiri:wght@400;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body data-view="home">
 
-  <!-- ================= Home: Khatam progress ================= -->
-  <section class="view home" id="home" aria-label="Khatam progress">
-    <div class="hero">
-      <div class="hero-bar">
-        <h1 class="hero-title">Khatam</h1>
-        <button class="icon-btn on-dark" data-open="settingsPanel" aria-label="Settings" title="Settings">
+  <!-- ================= Home ================= -->
+  <section class="view tab-view" id="view-home" aria-label="Home">
+    <div class="tab-inner">
+      <header class="home-head">
+        <div>
+          <p class="eyebrow">Your Quran journey</p>
+          <p class="greeting" lang="ar" dir="rtl">السلام عليكم</p>
+        </div>
+        <div class="head-actions">
+          <button class="round-btn" data-open="settingsPanel" aria-label="Settings">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          </button>
+          <button class="round-btn" data-tab-link="search" aria-label="Search">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <button class="card resume-card" id="resumeCard">
+        <span class="muted-label">Continue reading</span>
+        <span class="resume-surah" id="resumeSurah">Al-Fatihah</span>
+        <span class="resume-verse" id="resumeVerse">Verse 1</span>
+        <span class="resume-foot">
+          <span class="muted-small" id="resumeMeta">Surah 1</span>
+          <span class="resume-go"><span id="resumeText">Start</span>
+            <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </span>
+        </span>
+      </button>
+
+      <div class="card stats">
+        <div class="stat"><strong id="statStreak">0</strong><span>Day streak</span></div>
+        <div class="stat"><strong id="statJuz">0</strong><span>Juz done</span></div>
+        <div class="stat"><strong id="statPct">0%</strong><span>Completed</span></div>
+      </div>
+
+      <button class="card daily" id="dailyCard">
+        <span class="daily-head">
+          <span class="daily-date"><span id="dailyDay">Sat</span><span id="dailyNum">24</span></span>
+          <span class="daily-ref"><span>Daily verse</span><span id="dailyRef">Al-Ankabut 29:69</span></span>
+        </span>
+        <span class="verse-ar daily-ar" id="dailyArabic" lang="ar" dir="rtl"></span>
+        <span class="daily-trans" id="dailyTrans"></span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ================= Quran ================= -->
+  <section class="view tab-view" id="view-quran" aria-label="The Quran">
+    <div class="tab-inner">
+      <header class="page-head-row">
+        <div>
+          <h1 class="big-title">The Quran</h1>
+          <p class="subtitle" id="quranSubtitle">114 Surahs · Saheeh International</p>
+        </div>
+        <button class="round-btn" data-open="settingsPanel" aria-label="Settings">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
         </button>
-      </div>
-      <div class="hero-body">
-        <div class="hero-text">
-          <div class="hero-date">
-            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
-            <span id="khatamStart">Begin your khatam today</span>
-          </div>
-          <p class="hero-headline">Keep up the spirit for your completion!</p>
-        </div>
-        <svg class="hero-art" viewBox="0 0 200 160" aria-hidden="true">
-          <defs>
-            <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e2a35a"/><stop offset="1" stop-color="#b8692c"/></linearGradient>
-            <linearGradient id="page" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffaf0"/><stop offset="1" stop-color="#efe3cc"/></linearGradient>
-            <linearGradient id="cover" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e98a2c"/><stop offset="1" stop-color="#f5b04f"/></linearGradient>
-          </defs>
-          <ellipse cx="102" cy="146" rx="70" ry="9" fill="rgba(0,0,0,.18)"/>
-          <path d="M40 140 L150 92 L160 104 L52 150 Z" fill="url(#wood)"/>
-          <path d="M160 140 L50 92 L40 104 L148 150 Z" fill="url(#wood)" opacity=".92"/>
-          <path d="M22 66 L100 92 L100 118 L28 92 Z" fill="url(#cover)"/>
-          <path d="M178 54 L100 92 L100 118 L174 82 Z" fill="url(#cover)"/>
-          <path d="M28 58 Q64 50 100 84 L100 104 Q66 76 32 84 Z" fill="url(#page)"/>
-          <path d="M172 44 Q136 40 100 84 L100 104 Q134 66 168 70 Z" fill="url(#page)"/>
-          <g stroke="#d9c7a6" stroke-width="2" stroke-linecap="round">
-            <path d="M42 66 Q66 62 88 80"/><path d="M42 73 Q64 70 88 87"/><path d="M114 76 Q132 56 156 54"/><path d="M114 83 Q134 64 156 62"/>
-          </g>
-          <path d="M120 68 Q140 54 162 52 L160 60 Q140 62 122 76 Z" fill="#f5a623"/>
-        </svg>
-      </div>
-      <div class="hero-progress">
-        <div class="bar"><div class="bar-fill" id="progressFill"></div></div>
-        <span id="progressPct">0%</span>
-      </div>
-      <div class="hero-stats">
-        <span id="juzDone">0/30 Juz completed</span>
-        <span id="versesDone">0/6236 Verse completed</span>
-      </div>
-    </div>
+      </header>
 
-    <div class="home-body">
-      <h2 class="section-title">Progress</h2>
-      <div class="card continue-card">
-        <div class="continue-head">
-          <strong id="continueLabel">Al-Fatihah:1</strong>
-          <span class="ar" id="continueArabic">الفاتحة</span>
+      <button class="dark-card mushaf-banner" id="mushafBanner">
+        <span>
+          <span class="banner-title">Full Mushaf</span>
+          <span class="banner-sub">Arabic only · 604 pages</span>
+        </span>
+        <span class="banner-ar" lang="ar">المصحف</span>
+        <span class="banner-arrow"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </button>
+
+      <label class="field">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16M7 12h10M10 17h4"/></svg>
+        <input id="surahFilter" type="search" placeholder="Filter surahs" autocomplete="off">
+      </label>
+
+      <div class="segmented" id="quranSeg" role="tablist">
+        <button role="tab" class="seg active" data-seg="surahs">Surah</button>
+        <button role="tab" class="seg" data-seg="juz">Juz</button>
+        <button role="tab" class="seg" data-seg="bookmarks">Bookmarks</button>
+      </div>
+
+      <ul class="rows" id="quranList"></ul>
+    </div>
+  </section>
+
+  <!-- ================= Mushaf ================= -->
+  <section class="view tab-view" id="view-mushaf" aria-label="Mushaf">
+    <div class="tab-inner">
+      <header class="page-head-row">
+        <div>
+          <h1 class="big-title">Mushaf</h1>
+          <p class="subtitle">The Quran as a printed page — Arabic only</p>
         </div>
-        <button class="pill-btn" id="continueBtn"><span id="continueText">Start</span>
+      </header>
+
+      <div class="dark-card continue-mushaf">
+        <span class="banner-sub">Continue Reading</span>
+        <span class="mushaf-page" id="mushafPageLabel">Page 1</span>
+        <span class="banner-sub">of 604</span>
+        <button class="light-pill" id="mushafContinue"><span id="mushafContinueText">Start Reading</span>
           <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </button>
       </div>
 
-      <div class="tiles">
-        <button class="tile" data-action="mushaf">
-          <svg viewBox="0 0 24 24"><path d="M12 6C9 4 5 4 3 5v14c2-1 6-1 9 1 3-2 7-2 9-1V5c-2-1-6-1-9 1z"/><path d="M12 6v14"/></svg>
-          <span>Mushaf</span>
-        </button>
-        <button class="tile" data-action="surahs">
-          <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
-          <span>Surahs</span>
-        </button>
-        <button class="tile" data-action="bookmarks">
-          <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>
-          <span>Bookmarks</span>
-        </button>
-        <button class="tile" data-action="search">
-          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-          <span>Search</span>
-        </button>
+      <h2 class="section-title">Go to</h2>
+      <div class="segmented" id="gotoSeg" role="tablist">
+        <button role="tab" class="seg active" data-seg="page">Page</button>
+        <button role="tab" class="seg" data-seg="juz">Juz</button>
+        <button role="tab" class="seg" data-seg="surah">Surah</button>
       </div>
+      <form class="goto-row" id="gotoForm">
+        <input class="field-input" id="gotoInput" type="text" inputmode="numeric" placeholder="Page 1 – 604" autocomplete="off" aria-label="Go to">
+        <button class="dark-btn" type="submit">Open</button>
+      </form>
+      <p class="hint goto-hint" id="gotoHint"></p>
+    </div>
+  </section>
 
-      <div class="section-row">
-        <h2 class="section-title">Streak</h2>
-        <span class="streak-badge" id="streakBadge">
-          <svg viewBox="0 0 24 24"><path d="M12 2c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3 0-3-1-6 1-9.5z"/></svg>
-          <span id="streakCount">0x</span>
-        </span>
+  <!-- ================= Saved ================= -->
+  <section class="view tab-view" id="view-saved" aria-label="Bookmarks">
+    <div class="tab-inner">
+      <header class="page-head-row">
+        <div>
+          <h1 class="big-title">Bookmarks</h1>
+          <p class="subtitle" id="savedSubtitle">0 saved ayahs · 0 notes</p>
+        </div>
+      </header>
+      <div class="segmented two" id="savedSeg" role="tablist">
+        <button role="tab" class="seg active" data-seg="ayahs">Saved Ayahs</button>
+        <button role="tab" class="seg" data-seg="notes">Notes</button>
       </div>
-      <div class="card week" id="week"></div>
+      <div id="savedList" class="saved-list"></div>
+    </div>
+  </section>
 
-      <h2 class="section-title">Activities</h2>
-      <ul class="activities" id="activities"></ul>
+  <!-- ================= Search ================= -->
+  <section class="view tab-view" id="view-search" aria-label="Search">
+    <div class="tab-inner">
+      <header class="page-head-row">
+        <h1 class="big-title">Search</h1>
+      </header>
+      <form class="field" id="searchForm">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <input id="searchInput" type="search" placeholder="Surah name, word, or 2:255" autocomplete="off" enterkeyhint="search">
+      </form>
+      <hr class="divider">
+      <div class="empty-search" id="searchEmpty">
+        <span class="empty-ring"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></span>
+        <p>Search the Quran</p>
+      </div>
+      <ul class="rows" id="searchResults"></ul>
     </div>
   </section>
 
   <!-- ================= Reader ================= -->
   <section class="view reader-view" id="readerView" aria-label="Reader">
     <header class="topbar">
-      <button class="icon-btn" id="backBtn" aria-label="Back to Khatam" title="Back">
-        <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+      <button class="icon-btn" id="backBtn" aria-label="Back" title="Back">
+        <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
       </button>
       <div class="topbar-title">
         <div id="surahTitle" class="surah-title">الفاتحة</div>
         <div id="pageMeta" class="page-meta">Page 1 · Juz 1</div>
       </div>
       <div class="topbar-actions">
-        <button class="icon-btn" data-open="searchPanel" aria-label="Search" title="Search (/)">
+        <button class="icon-btn" data-tab-link="search" aria-label="Search" title="Search (/)">
           <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-        </button>
-        <button class="icon-btn" data-open="drawer" aria-label="Index" title="Surahs and juz">
-          <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
         </button>
         <button class="icon-btn mushaf-only" id="markPageBtn" aria-label="Mark page as read" title="Mark page as read">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>
@@ -137,6 +196,10 @@
         </button>
       </div>
     </header>
+
+    <button class="float-back mushaf-only" id="floatBack" aria-label="Back">
+      <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+    </button>
 
     <!-- Verse-by-verse mode -->
     <nav class="surah-tabs verses-only" id="surahTabs" dir="rtl" aria-label="Surahs"></nav>
@@ -172,36 +235,32 @@
     </div>
   </section>
 
-  <!-- ================= Panels ================= -->
-  <aside class="drawer" id="drawer" aria-hidden="true">
-    <div class="drawer-head">
-      <div class="tabs" role="tablist">
-        <button role="tab" class="tab active" data-tab="surahs">Surah</button>
-        <button role="tab" class="tab" data-tab="juz">Juz</button>
-        <button role="tab" class="tab" data-tab="bookmarks">Bookmarks</button>
-      </div>
-      <button class="icon-btn" data-close aria-label="Close">
-        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-    </div>
-    <input class="filter" id="surahFilter" type="search" placeholder="Filter surahs…">
-    <ul class="list" id="indexList"></ul>
-  </aside>
+  <!-- ================= Tab bar ================= -->
+  <nav class="tabbar" aria-label="Main">
+    <button class="tabbar-item" data-tab-link="home">
+      <svg viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V19a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></svg>
+      <span>Home</span>
+    </button>
+    <button class="tabbar-item" data-tab-link="quran">
+      <svg viewBox="0 0 24 24"><path d="M12 6C9 4 5 4 3 5v14c2-1 6-1 9 1 3-2 7-2 9-1V5c-2-1-6-1-9 1z"/><path d="M12 6v14"/></svg>
+      <span>Quran</span>
+    </button>
+    <button class="tabbar-item" data-tab-link="mushaf">
+      <svg viewBox="0 0 24 24"><path d="M5 4h13a1 1 0 0 1 1 1v15H7a2 2 0 0 1-2-2z"/><path d="M5 18a2 2 0 0 1 2-2h12"/><path d="M10 4v6l2-1.5 2 1.5V4"/></svg>
+      <span>Mushaf</span>
+    </button>
+    <button class="tabbar-item" data-tab-link="saved">
+      <svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>
+      <span>Saved</span>
+    </button>
+    <button class="tabbar-item" data-tab-link="search">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+      <span>Search</span>
+    </button>
+  </nav>
 
-  <aside class="drawer drawer-right" id="searchPanel" aria-hidden="true">
-    <div class="drawer-head">
-      <strong>Search</strong>
-      <button class="icon-btn" data-close aria-label="Close">
-        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-    </div>
-    <form id="searchForm" class="search-form">
-      <input id="searchInput" type="search" placeholder="Search text, a surah, a page, or 2:255" autocomplete="off">
-    </form>
-    <ul class="list" id="searchResults"></ul>
-  </aside>
-
-  <aside class="drawer drawer-right" id="settingsPanel" aria-hidden="true">
+  <!-- ================= Settings ================= -->
+  <aside class="drawer" id="settingsPanel" aria-hidden="true">
     <div class="drawer-head">
       <strong>Settings</strong>
       <button class="icon-btn" data-close aria-label="Close">
@@ -237,8 +296,8 @@
       </label>
       <label class="check"><input type="checkbox" id="showTranslit"> Show transliteration</label>
       <label class="check"><input type="checkbox" id="autoAdvance"> Keep playing into the next page or surah</label>
-      <button class="danger-btn" id="resetKhatam">Restart khatam</button>
-      <p class="hint">Keyboard: ← / → turn pages, Space plays, B bookmarks, / searches.</p>
+      <button class="danger-btn" id="resetKhatam">Reset reading progress</button>
+      <p class="hint">In the Mushaf, tap the page to show or hide the controls. Keyboard: ← / → turn pages, Space plays, B bookmarks, / searches.</p>
     </div>
   </aside>
 
@@ -256,11 +315,19 @@
       <div class="verse-translit" id="sheetTranslit"></div>
       <div class="verse-trans" id="sheetTrans"></div>
     </div>
+    <div class="note-editor" id="noteEditor" hidden>
+      <textarea id="noteText" rows="4" placeholder="Write a reflection or reminder for this ayah…"></textarea>
+      <div class="note-buttons">
+        <button class="ghost-btn" id="noteDelete" type="button">Delete</button>
+        <button class="dark-btn" id="noteSave" type="button">Save note</button>
+      </div>
+    </div>
     <div class="sheet-actions">
       <button class="action" id="actShare"><span class="action-ico"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.5M8.2 13.2l7.6 4.5"/></svg></span>Share</button>
       <button class="action" id="actPlay"><span class="action-ico"><svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg></span>Play</button>
       <button class="action" id="actMark"><span class="action-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg></span><span id="actMarkLabel">Mark read</span></button>
       <button class="action" id="actBookmark"><span class="action-ico"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg></span>Bookmark</button>
+      <button class="action" id="actNote"><span class="action-ico"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></span>Note</button>
       <button class="action" id="actCopy"><span class="action-ico"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg></span>Copy</button>
     </div>
   </div>
