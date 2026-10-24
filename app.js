@@ -6,11 +6,19 @@
   const AUDIO_BASE = "https://everyayah.com/data";
   const QCF = "https://cdn.jsdelivr.net/npm/quran-qcf4@1.1.0";
   const HEADER_FONT = "QCF4_QBSML";
+  const BASMALA_GLYPH = ["", "QCF4_Hafs_01"];
   const TOTAL_PAGES = 604;
+  const TOTAL_VERSES = 6236;
   const LINES_PER_PAGE = 15;
   const MAX_PAGE_RATIO = 0.68; // width / height on wide screens
   const MIN_PAGE_RATIO = 0.5; // narrowest a page may get on tall phone screens
   const BISMILLAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
+  const ICONS = {
+    bookmark: '<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg>',
+    more: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M8 12h.01M12 12h.01M16 12h.01" stroke-width="2.6"/></svg>',
+    close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    check: '<svg viewBox="0 0 24 24"><path d="M6 12l4 4 8-8"/></svg>',
+  };
 
   const { SURAHS, JUZ, RECITERS, DEFAULT_TRANSLATIONS, PAGE_FIRST_VERSE } = window;
   const $ = (id) => document.getElementById(id);
@@ -24,6 +32,7 @@
   const pad3 = (n) => String(n).padStart(3, "0");
   const splitKey = (key) => key.split(":").map(Number);
   const clampPage = (p) => Math.min(TOTAL_PAGES, Math.max(1, p | 0));
+  const dateKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
   // ---------- persistence ----------
   const store = {
@@ -42,9 +51,11 @@
     theme: "light",
     layout: "auto",
     script: "glyph",
+    mode: "mushaf",
     reciter: RECITERS[0][0],
     translation: DEFAULT_TRANSLATIONS[0][0],
     autoAdvance: true,
+    showTranslit: true,
   }, store.get("settings", {}));
   const saveSettings = () => store.set("settings", settings);
   // Earlier versions defaulted to plain text; move everyone to the Madani glyphs once.
@@ -53,7 +64,26 @@
   let bookmarks = store.get("bookmarks", []);
   const saveBookmarks = () => store.set("bookmarks", bookmarks);
 
+  // Khatam progress: which verses are read, the days something was read, and a short activity log.
+  const khatam = Object.assign({ start: null, read: [] }, store.get("khatam", {}));
+  const readSet = new Set(khatam.read);
+  const saveKhatam = () => { khatam.read = [...readSet]; store.set("khatam", khatam); };
+  const readDays = new Set(store.get("days", []));
+  let activities = store.get("activities", []);
+  let lastPos = store.get("lastPos", null) || (store.get("lastPage", null) ? { mode: "mushaf", page: store.get("lastPage") } : null);
+
   // ---------- metadata helpers ----------
+  const verseStart = [0];
+  SURAHS.forEach((m) => verseStart.push(verseStart[verseStart.length - 1] + m[3]));
+  const verseIndex = (key) => { const [s, a] = splitKey(key); return verseStart[s - 1] + a - 1; };
+  const keyAt = (i) => {
+    let s = 1;
+    while (verseStart[s] <= i) s++;
+    return `${s}:${i - verseStart[s - 1] + 1}`;
+  };
+  const juzStarts = JUZ.map(([key]) => verseIndex(key));
+  const juzOfIndex = (i) => { let j = 0; while (j + 1 < juzStarts.length && juzStarts[j + 1] <= i) j++; return j; };
+
   const juzForPage = (p) => {
     let j = 1;
     JUZ.forEach(([, start], i) => { if (start <= p) j = i + 1; });
@@ -73,11 +103,30 @@
     const [s, a] = splitKey(key);
     return `${SURAHS[s - 1][1]} ${s}:${a}`;
   };
+  const compareKeys = (a, b) => {
+    const [s1, a1] = splitKey(a), [s2, a2] = splitKey(b);
+    return s1 - s2 || a1 - a2;
+  };
+  function pageForVerse(key) {
+    let lo = 0, hi = PAGE_FIRST_VERSE.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (compareKeys(PAGE_FIRST_VERSE[mid], key) <= 0) lo = mid; else hi = mid - 1;
+    }
+    return lo + 1;
+  }
+  const versesOnPage = (p) => {
+    const from = verseIndex(PAGE_FIRST_VERSE[p - 1]);
+    const to = p < TOTAL_PAGES ? verseIndex(PAGE_FIRST_VERSE[p]) : TOTAL_VERSES;
+    const out = [];
+    for (let i = from; i < to; i++) out.push(keyAt(i));
+    return out;
+  };
 
   // ---------- data loading ----------
-  // Page layout and glyph fonts: KFGQPC QCF4 (Madinah Mushaf 1441H) via the quran-qcf4 package.
   const pageCache = new Map();
-  const translationCache = new Map();
+  const surahCache = new Map();
+  const translitCache = new Map();
   const fontCache = new Map();
 
   async function fetchJSON(url) {
@@ -95,6 +144,7 @@
     return map.get(key);
   }
 
+  // Page layout and glyph fonts: KFGQPC QCF4 (Madinah Mushaf 1441H) via the quran-qcf4 package.
   const loadPage = (p) => cached(pageCache, p, () => fetchJSON(`${QCF}/pages/${pad3(p)}.json`));
 
   const loadFont = (name) => cached(fontCache, name, () => {
@@ -103,12 +153,18 @@
     return face.load().then((f) => { document.fonts.add(f); });
   });
 
-  // Uthmani text and the selected translation for one page, from quran.com.
-  const loadTranslations = (p) => cached(translationCache, `${p}|${settings.translation}`, async () => {
+  const fontsOf = (data) => {
+    const fonts = new Set();
+    data.lines.forEach((l) => l.words.forEach((w) => fonts.add(w.font)));
+    return [...fonts];
+  };
+
+  // Uthmani text and the selected translation for a whole surah, from quran.com.
+  const loadSurahVerses = (s) => cached(surahCache, `${s}|${settings.translation}`, async () => {
     const out = new Map();
     let next = 1;
     while (next) {
-      const data = await fetchJSON(`${API}/verses/by_page/${p}?fields=text_uthmani` +
+      const data = await fetchJSON(`${API}/verses/by_chapter/${s}?fields=text_uthmani` +
         `&translations=${settings.translation}&per_page=50&page=${next}`);
       data.verses.forEach((v) => out.set(v.verse_key, v));
       next = data.pagination && data.pagination.next_page;
@@ -116,21 +172,252 @@
     return out;
   });
 
-  const compareKeys = (a, b) => {
-    const [s1, a1] = splitKey(a), [s2, a2] = splitKey(b);
-    return s1 - s2 || a1 - a2;
-  };
-  function pageForVerse(key) {
-    let lo = 0, hi = PAGE_FIRST_VERSE.length - 1;
-    while (lo < hi) {
-      const mid = (lo + hi + 1) >> 1;
-      if (compareKeys(PAGE_FIRST_VERSE[mid], key) <= 0) lo = mid; else hi = mid - 1;
-    }
-    return lo + 1;
+  const loadTranslit = (s) => cached(translitCache, s, async () => {
+    const data = await fetchJSON(`${ALQURAN}/surah/${s}/en.transliteration`);
+    return data.data.ayahs.map((a) => a.text);
+  });
+
+  function cleanTranslation(html) {
+    const tpl = document.createElement("template");
+    tpl.innerHTML = html || "";
+    tpl.content.querySelectorAll("sup").forEach((s) => s.remove());
+    return tpl.content.textContent.trim();
   }
 
-  // ---------- state ----------
-  let currentPage = clampPage(parseInt(location.hash.slice(1), 10) || store.get("lastPage", 1));
+  // Fill `box` with one verse in the Mushaf glyphs (or plain text), ending in its ayah marker.
+  async function fillVerseArabic(box, key) {
+    const [s, a] = splitKey(key);
+    if (settings.script === "glyph") {
+      try {
+        const data = await loadPage(pageForVerse(key));
+        const words = [];
+        data.lines.forEach((l) => l.words.forEach((w) => {
+          if (w.verse_key === key && (w.type === "word" || w.type === "end")) words.push(w);
+        }));
+        await Promise.all([...new Set(words.map((w) => w.font))].map(loadFont));
+        box.replaceChildren();
+        words.forEach((w) => {
+          const span = el("span", null, w.char);
+          span.style.fontFamily = w.font;
+          box.append(span);
+        });
+        box.classList.add("glyph");
+        return;
+      } catch { /* fall back to text below */ }
+    }
+    box.classList.remove("glyph");
+    let text = "";
+    try {
+      const v = (await loadSurahVerses(s)).get(key);
+      text = v ? v.text_uthmani : "";
+    } catch {
+      try {
+        const data = await loadPage(pageForVerse(key));
+        const words = [];
+        data.lines.forEach((l) => l.words.forEach((w) => { if (w.verse_key === key && w.type === "word") words.push(w.text); }));
+        text = words.join(" ");
+      } catch { /* leave empty */ }
+    }
+    const badge = el("span", "star accent num", String(a));
+    box.replaceChildren(text + " ", badge);
+  }
+
+  // ---------- khatam tracking ----------
+  function touchDay() {
+    const today = dateKey();
+    if (readDays.has(today)) return;
+    readDays.add(today);
+    store.set("days", [...readDays].sort().slice(-400));
+  }
+
+  function logActivity(entry) {
+    const top = activities[0];
+    const now = Date.now();
+    if (entry.type === "read" && top && top.type === "read" && top.surah === entry.surah && now - top.time < 30 * 60e3) {
+      top.from = Math.min(top.from, entry.from);
+      top.to = Math.max(top.to, entry.to);
+      top.time = now;
+    } else {
+      activities.unshift(Object.assign({ time: now }, entry));
+      activities = activities.slice(0, 30);
+    }
+    store.set("activities", activities);
+  }
+
+  function setRead(keys, read) {
+    let changed = false;
+    keys.forEach((k) => {
+      if (read && !readSet.has(k)) { readSet.add(k); changed = true; }
+      if (!read && readSet.has(k)) { readSet.delete(k); changed = true; }
+    });
+    if (!changed) return;
+    if (read) {
+      if (!khatam.start) khatam.start = Date.now();
+      touchDay();
+    }
+    saveKhatam();
+    keys.forEach((k) => {
+      const card = $(cardId(k));
+      if (card) {
+        card.classList.toggle("read", read);
+        card.querySelector(".mark input").checked = read;
+      }
+    });
+    updateMarkPageBtn();
+  }
+
+  function toggleVerseRead(key) {
+    const read = !readSet.has(key);
+    setRead([key], read);
+    if (read) {
+      const [s, a] = splitKey(key);
+      logActivity({ type: "read", surah: s, from: a, to: a });
+    }
+    return read;
+  }
+
+  function streakCount() {
+    let n = 0;
+    const d = new Date();
+    if (!readDays.has(dateKey(d))) d.setDate(d.getDate() - 1);
+    while (readDays.has(dateKey(d))) { n++; d.setDate(d.getDate() - 1); }
+    return n;
+  }
+
+  function relativeTime(t) {
+    const diff = Date.now() - t;
+    if (diff < 60e3) return "Just now";
+    if (diff < 3600e3) return `${Math.floor(diff / 60e3)} min ago`;
+    const d = new Date(t);
+    const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    if (dateKey(d) === dateKey()) return `Today, ${time}`;
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    if (dateKey(d) === dateKey(y)) return `Yesterday, ${time}`;
+    return d.toLocaleDateString([], { day: "numeric", month: "short" });
+  }
+
+  function activityText(a) {
+    if (a.type === "read") {
+      const name = SURAHS[a.surah - 1][1];
+      return a.from === a.to ? `Read ${name} ${a.surah}:${a.from}` : `Read ${name} ${a.surah}:${a.from}–${a.to}`;
+    }
+    if (a.type === "page") return `Read page ${a.page} · ${SURAHS[surahForPage(a.page) - 1][1]}`;
+    if (a.type === "bookmark") return a.key ? `Bookmarked ${verseLabel(a.key)}` : `Bookmarked page ${a.page}`;
+    if (a.type === "khatam") return "Started a new khatam";
+    return "";
+  }
+
+  function renderHome() {
+    const total = readSet.size;
+    const perJuz = new Array(30).fill(0);
+    readSet.forEach((k) => perJuz[juzOfIndex(verseIndex(k))]++);
+    const juzDone = perJuz.filter((n, j) => n >= (j < 29 ? juzStarts[j + 1] : TOTAL_VERSES) - juzStarts[j]).length;
+    const pct = Math.floor((total / TOTAL_VERSES) * 100);
+    $("progressFill").style.width = `${(total / TOTAL_VERSES) * 100}%`;
+    $("progressPct").textContent = `${pct}%`;
+    $("juzDone").textContent = `${juzDone}/30 Juz completed`;
+    $("versesDone").textContent = `${total}/${TOTAL_VERSES} Verse completed`;
+    $("khatamStart").textContent = khatam.start
+      ? "Start " + new Date(khatam.start).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
+      : "Begin your khatam today";
+
+    const key = resumeKey();
+    const [s, a] = splitKey(key);
+    $("continueLabel").textContent = `${SURAHS[s - 1][1]}:${a}`;
+    $("continueArabic").textContent = SURAHS[s - 1][0];
+    $("continueText").textContent = lastPos || total ? "Continue" : "Start";
+
+    const streak = streakCount();
+    $("streakCount").textContent = `${streak}x`;
+    const week = $("week");
+    week.replaceChildren();
+    const monday = new Date();
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    "MTWTFSS".split("").forEach((letter, i) => {
+      const d = new Date(monday); d.setDate(monday.getDate() + i);
+      const day = el("div", "day");
+      if (readDays.has(dateKey(d))) day.classList.add("done");
+      if (dateKey(d) === dateKey()) day.classList.add("today");
+      const dot = el("div", "day-dot");
+      dot.innerHTML = ICONS.check;
+      day.append(dot, el("span", null, letter));
+      week.append(day);
+    });
+
+    const list = $("activities");
+    list.replaceChildren();
+    if (!activities.length) list.append(el("li", "card activity empty", "Your reading activity will show up here."));
+    activities.slice(0, 8).forEach((a, i) => {
+      const li = el("li", "card activity");
+      const info = el("div", "info");
+      info.append(el("div", "what", activityText(a)), el("div", "when", relativeTime(a.time)));
+      li.append(el("span", "star accent", String(i + 1)), info);
+      li.style.cursor = "pointer";
+      li.addEventListener("click", () => {
+        if (a.type === "read") openVerse(`${a.surah}:${a.from}`);
+        else if (a.type === "bookmark" && a.key) openVerse(a.key);
+        else if (a.page) openMushaf(a.page);
+      });
+      list.append(li);
+    });
+  }
+
+  // Where "Continue" picks up: the last reading position, else the first unread verse.
+  function resumeKey() {
+    if (lastPos) return lastPos.key || PAGE_FIRST_VERSE[(lastPos.page || 1) - 1];
+    for (let i = 0; i < TOTAL_VERSES; i++) if (!readSet.has(keyAt(i))) return keyAt(i);
+    return "1:1";
+  }
+
+  function savePos(pos) {
+    lastPos = pos;
+    store.set("lastPos", pos);
+  }
+
+  // ---------- views & routing ----------
+  let view = "home";
+  function setHash(h, push) {
+    if (location.hash === h || (!location.hash && h === "#/")) return;
+    history[push ? "pushState" : "replaceState"](null, "", h);
+  }
+  function setMode(mode) {
+    settings.mode = mode;
+    saveSettings();
+    document.body.dataset.mode = mode;
+  }
+  function showView(v) {
+    view = v;
+    document.body.dataset.view = v;
+    closeSheet();
+    if (v === "home") renderHome();
+    applyThemeColor();
+  }
+  function showHome(push = true) {
+    showView("home");
+    setHash("#/", push);
+  }
+  function openMushaf(page, push = true) {
+    const wasReader = view === "reader";
+    setMode("mushaf");
+    showView("reader");
+    touchDay();
+    return goTo(page, { push: push && !wasReader });
+  }
+  function openVerse(key) {
+    const [s, a] = splitKey(key);
+    if (settings.mode === "verses") return openSurah(s, a);
+    return openMushaf(pageForVerse(key)).then(() => flashVerse(key));
+  }
+  function applyRoute() {
+    const h = decodeURIComponent(location.hash.slice(1));
+    let m;
+    if ((m = h.match(/^p?(\d{1,3})$/))) return openMushaf(clampPage(+m[1]), false);
+    if ((m = h.match(/^s(\d{1,3})(?::(\d{1,3}))?$/)) && +m[1] >= 1 && +m[1] <= 114) return openSurah(+m[1], m[2] ? +m[2] : null, false);
+    showView("home");
+  }
+
+  // ---------- Mushaf mode ----------
+  let currentPage = 1;
   let visiblePages = [];
   const verseText = new Map(); // verse key -> Arabic text, for visible pages
   let renderToken = 0;
@@ -147,7 +434,6 @@
     return right + 1 <= TOTAL_PAGES ? [right, right + 1] : [right];
   };
 
-  // ---------- rendering ----------
   function sizePages() {
     const spread = $("spread");
     const pages = spread.querySelectorAll(".page");
@@ -190,18 +476,18 @@
     lines.style.fontSize = `${Math.min(byWidth, byHeight).toFixed(2)}px`;
   }
 
+  const spinnerBox = (cls = "page-loading") => { const b = el("div", cls); b.append(el("div", "spinner")); return b; };
+
   function pageShell(p) {
     const page = el("section", "page");
     page.dataset.page = p;
     const head = el("div", "page-head");
-    head.append(el("span", "head-surah", "سورة " + SURAHS[surahForPage(p) - 1][0]),
-      el("span", "head-juz", "الجزء " + arabicDigits(juzForPage(p))));
+    head.append(el("span", "head-surah", SURAHS[surahForPage(p) - 1][1]), el("span", "head-juz", `Juz ${juzForPage(p)}`));
     const foot = el("div", "page-foot");
-    foot.append(el("span", "page-num", arabicDigits(p)));
+    foot.append(el("span", "page-num", String(p)));
     page.append(head, spinnerBox(), foot);
     return page;
   }
-  const spinnerBox = () => { const b = el("div", "page-loading"); b.append(el("div", "spinner")); return b; };
 
   function buildLines(data, glyph) {
     const frag = document.createDocumentFragment();
@@ -255,18 +541,14 @@
     try {
       const data = await loadPage(p);
       let glyph = settings.script === "glyph";
-      if (glyph) {
-        const fonts = new Set();
-        data.lines.forEach((l) => l.words.forEach((w) => fonts.add(w.font)));
-        glyph = await Promise.all([...fonts].map(loadFont)).then(() => true, () => false);
-      }
+      if (glyph) glyph = await Promise.all(fontsOf(data).map(loadFont)).then(() => true, () => false);
       if (token !== renderToken) return;
       indexVerseText(data);
       const lines = el("div", "lines");
       lines.append(buildLines(data, glyph));
       pageEl.classList.toggle("short", data.lines.length < LINES_PER_PAGE);
       pageEl.classList.toggle("glyph", glyph);
-      if (data.surahs && data.surahs[0]) pageEl.querySelector(".head-surah").textContent = "سورة " + SURAHS[data.surahs[0].id - 1][0];
+      if (data.surahs && data.surahs[0]) pageEl.querySelector(".head-surah").textContent = SURAHS[data.surahs[0].id - 1][1];
       pageEl.children[1].replaceWith(lines);
       fitPage(pageEl);
       if (!glyph) document.fonts.ready.then(() => fitPage(pageEl));
@@ -276,7 +558,7 @@
       const box = el("div", "page-error");
       const inner = el("div");
       inner.append(el("div", null, "Couldn't load this page. Check your connection."));
-      const retry = el("button", null, "Retry");
+      const retry = el("button", "ghost-btn", "Retry");
       retry.addEventListener("click", () => { box.replaceWith(spinnerBox()); renderPage(p, pageEl, renderToken); });
       inner.append(retry);
       box.append(inner);
@@ -296,14 +578,11 @@
 
     const first = visiblePages[0];
     const last = visiblePages[visiblePages.length - 1];
-    $("surahTitle").textContent = SURAHS[surahForPage(first) - 1][0];
-    $("pageMeta").textContent = `${SURAHS[surahForPage(first) - 1][1]} · Page ${visiblePages.join("–")} · Juz ${juzForPage(first)}`;
-    $("gotoInput").value = "";
-    $("gotoInput").placeholder = String(first);
+    setTitle(surahForPage(first), `Page ${visiblePages.join("–")} · Juz ${juzForPage(first)}`);
     $("prevBtn").disabled = first <= 1;
     $("nextBtn").disabled = last >= TOTAL_PAGES;
     updateBookmarkBtn();
-    document.title = `${SURAHS[surahForPage(first) - 1][1]} — Page ${first} · Mushaf Quran`;
+    updateMarkPageBtn();
 
     // Warm the cache for the following spread.
     done.then(() => {
@@ -312,29 +591,209 @@
     return done;
   }
 
-  function goTo(p, { push = true } = {}) {
+  function setTitle(s, meta) {
+    $("surahTitle").textContent = SURAHS[s - 1][0];
+    $("pageMeta").textContent = `${SURAHS[s - 1][1]} · ${meta}`;
+    document.title = `${SURAHS[s - 1][1]} · Mushaf Quran`;
+  }
+
+  function goTo(p, { push = false } = {}) {
     currentPage = clampPage(p);
-    store.set("lastPage", currentPage);
-    if (push && location.hash !== "#" + currentPage) history.replaceState(null, "", "#" + currentPage);
-    closePopover();
+    savePos({ mode: "mushaf", page: currentPage });
+    setHash("#p" + currentPage, push);
+    closeSheet();
     return render();
   }
-  const step = () => visiblePages.length;
   const nextPage = () => { const last = visiblePages[visiblePages.length - 1]; if (last < TOTAL_PAGES) return goTo(last + 1); };
-  const prevPage = () => { const first = visiblePages[0]; if (first > 1) return goTo(first - step()); };
+  const prevPage = () => { const first = visiblePages[0]; if (first > 1) return goTo(first - visiblePages.length); };
 
-  async function goToVerse(key) {
-    const p = pageForVerse(key);
-    if (!visiblePages.includes(p)) await goTo(p);
+  function flashVerse(key) {
     document.querySelectorAll(`.word[data-key="${key}"]`).forEach((w) => {
       w.classList.remove("flash"); void w.offsetWidth; w.classList.add("flash");
     });
+  }
+
+  const visibleVerseKeys = () => visiblePages.flatMap(versesOnPage);
+  function updateMarkPageBtn() {
+    const keys = visibleVerseKeys();
+    $("markPageBtn").classList.toggle("active", keys.length > 0 && keys.every((k) => readSet.has(k)));
+  }
+  function toggleMarkPage() {
+    const keys = visibleVerseKeys();
+    const read = !keys.every((k) => readSet.has(k));
+    setRead(keys, read);
+    if (read) {
+      visiblePages.forEach((p) => logActivity({ type: "page", page: p }));
+      toast(visiblePages.length > 1 ? `Pages ${visiblePages.join(" & ")} marked as read` : `Page ${visiblePages[0]} marked as read`);
+    } else {
+      toast("Marked as unread");
+    }
+  }
+
+  // ---------- verse-by-verse mode ----------
+  let curSurah = null;
+  let surahToken = 0;
+  let glyphObserver = null;
+  const cardId = (key) => "v" + key.replace(":", "-");
+
+  function buildSurahTabs() {
+    const nav = $("surahTabs");
+    SURAHS.forEach((m, i) => {
+      const b = el("button", "surah-tab", m[1]);
+      b.dataset.surah = i + 1;
+      b.addEventListener("click", () => openSurah(i + 1));
+      nav.append(b);
+    });
+  }
+
+  function verseCard(key) {
+    const [, a] = splitKey(key);
+    const card = el("article", "card verse-card");
+    card.id = cardId(key);
+    card.dataset.key = key;
+    if (readSet.has(key)) card.classList.add("read");
+    const ar = el("div", "verse-ar");
+    ar.lang = "ar";
+    ar.append(el("span", "star accent num", String(a)));
+    const foot = el("div", "verse-foot");
+    const mark = el("label", "mark");
+    const box = el("input");
+    box.type = "checkbox";
+    box.checked = readSet.has(key);
+    mark.append(box, document.createTextNode("Mark"));
+    const bm = el("button", "icon-btn bm");
+    bm.setAttribute("aria-label", "Bookmark ayah");
+    bm.innerHTML = ICONS.bookmark;
+    bm.classList.toggle("active", bookmarks.some((b) => b.key === key));
+    const more = el("button", "icon-btn more");
+    more.setAttribute("aria-label", "More actions");
+    more.innerHTML = ICONS.more;
+    foot.append(mark, bm, more);
+    card.append(ar, el("div", "verse-translit"), el("div", "verse-trans"), foot);
+    return card;
+  }
+
+  async function openSurah(s, verse = null, push = true) {
+    const wasReader = view === "reader";
+    setMode("verses");
+    showView("reader");
+    touchDay();
+    const token = ++surahToken;
+    curSurah = s;
+    const m = SURAHS[s - 1];
+    setHash(verse ? `#s${s}:${verse}` : `#s${s}`, push && !wasReader);
+    setTitle(s, `${m[3]} verses · Juz ${juzForPage(m[4])}`);
+    savePos({ mode: "verses", key: `${s}:${verse || 1}` });
+
+    document.querySelectorAll(".surah-tab").forEach((t) => t.classList.toggle("active", +t.dataset.surah === s));
+    const active = document.querySelector(".surah-tab.active");
+    if (active) active.scrollIntoView({ block: "nearest", inline: "center" });
+
+    const inner = el("div", "verses-inner");
+    const meta = el("div", "surah-meta");
+    meta.append(el("strong", null, m[1]), el("span", "chip", `${m[3]} Verses`), el("span", "chip", m[5] === "Meccan" ? "Makkiyah" : "Madaniyah"));
+    inner.append(meta);
+    if (s !== 1 && s !== 9) {
+      const basmala = el("div", "card basmala-card", BISMILLAH);
+      inner.append(basmala);
+      if (settings.script === "glyph") {
+        loadFont(BASMALA_GLYPH[1]).then(() => {
+          basmala.textContent = BASMALA_GLYPH[0];
+          basmala.style.fontFamily = BASMALA_GLYPH[1];
+          basmala.classList.add("glyph");
+        }, () => {});
+      }
+    }
+    const cards = [];
+    for (let a = 1; a <= m[3]; a++) {
+      const card = verseCard(`${s}:${a}`);
+      cards.push(card);
+      inner.append(card);
+    }
+    if (s < 114) {
+      const next = el("button", "pill-btn next-surah", `Continue to ${SURAHS[s][1]}`);
+      next.addEventListener("click", () => openSurah(s + 1));
+      inner.append(next);
+    }
+    const container = $("verses");
+    container.replaceChildren(inner);
+    container.scrollTop = 0;
+
+    // Arabic is filled lazily, a card at a time, as it scrolls into view.
+    if (glyphObserver) glyphObserver.disconnect();
+    glyphObserver = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return;
+        glyphObserver.unobserve(e.target);
+        fillVerseArabic(e.target.querySelector(".verse-ar"), e.target.dataset.key);
+      });
+    }, { root: container, rootMargin: "800px 0px" });
+    cards.forEach((c) => glyphObserver.observe(c));
+
+    loadSurahVerses(s).then((verses) => {
+      if (token !== surahToken) return;
+      cards.forEach((card) => {
+        const v = verses.get(card.dataset.key);
+        const tr = v && v.translations && v.translations[0];
+        card.querySelector(".verse-trans").textContent = tr ? cleanTranslation(tr.text) : "";
+      });
+    }, () => {
+      if (token === surahToken) toast("Translation unavailable right now");
+    });
+    if (settings.showTranslit) {
+      loadTranslit(s).then((list) => {
+        if (token !== surahToken) return;
+        cards.forEach((card, i) => { card.querySelector(".verse-translit").textContent = list[i] || ""; });
+      }, () => {});
+    }
+
+    if (verse) {
+      const card = $(cardId(`${s}:${verse}`));
+      if (card) {
+        card.scrollIntoView({ block: "start" });
+        card.classList.add("flash");
+      }
+    }
+    if (playingKey) markPlaying(playingKey);
+  }
+
+  function topVisibleKey() {
+    const container = $("verses");
+    const top = container.getBoundingClientRect().top + 40;
+    const cards = container.querySelectorAll(".verse-card");
+    for (const c of cards) if (c.getBoundingClientRect().bottom > top) return c.dataset.key;
+    return cards.length ? cards[0].dataset.key : null;
+  }
+
+  let scrollTimer;
+  function onVersesScroll() {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      const key = topVisibleKey();
+      if (!key) return;
+      savePos({ mode: "verses", key });
+      const [s, a] = splitKey(key);
+      setHash(`#s${s}:${a}`, false);
+      setTitle(s, `${SURAHS[s - 1][3]} verses · Juz ${juzOfIndex(verseIndex(key)) + 1}`);
+    }, 250);
+  }
+
+  function switchMode() {
+    if (settings.mode === "mushaf") {
+      const w = document.querySelector(".spread .word[data-key]");
+      const key = w ? w.dataset.key : PAGE_FIRST_VERSE[currentPage - 1];
+      const [s, a] = splitKey(key);
+      openSurah(s, a > 1 ? a : null, false);
+    } else {
+      openMushaf(pageForVerse(topVisibleKey() || `${curSurah}:1`), false);
+    }
   }
 
   // ---------- audio ----------
   const audio = $("audio");
   let playingKey = null;
   let bismillahPending = false;
+  let repeat = false;
 
   const audioUrl = (key) => {
     const [s, a] = splitKey(key);
@@ -344,10 +803,19 @@
     const [s, a] = splitKey(key);
     return a === 1 && s !== 1 && s !== 9;
   };
+  const reciterName = () => (RECITERS.find((r) => r[0] === settings.reciter) || RECITERS[0])[1];
 
   function markPlaying(key) {
-    document.querySelectorAll(".word.playing").forEach((w) => w.classList.remove("playing"));
-    if (key) document.querySelectorAll(`.word[data-key="${key}"]`).forEach((w) => w.classList.add("playing"));
+    document.querySelectorAll(".word.playing, .verse-card.playing").forEach((w) => w.classList.remove("playing"));
+    if (!key) return;
+    document.querySelectorAll(`.word[data-key="${key}"]`).forEach((w) => w.classList.add("playing"));
+    const card = $(cardId(key));
+    if (card && settings.mode === "verses") {
+      card.classList.add("playing");
+      const r = card.getBoundingClientRect();
+      const c = $("verses").getBoundingClientRect();
+      if (r.top < c.top || r.bottom > c.bottom - 90) card.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
   }
 
   function playVerse(key) {
@@ -356,7 +824,7 @@
     audio.src = bismillahPending ? audioUrl("1:1") : audioUrl(key);
     audio.play().catch(() => toast("Audio couldn't start"));
     markPlaying(key);
-    $("audioInfo").textContent = `${verseLabel(key)} · ${RECITERS.find((r) => r[0] === settings.reciter)[1]}`;
+    $("audioInfo").textContent = verseLabel(key);
     $("playBtn").classList.add("playing");
     const nk = nextVerseKey(key);
     if (nk) new Audio().src = audioUrl(nk); // preload the following ayah
@@ -367,13 +835,12 @@
     playingKey = null;
     markPlaying(null);
     $("playBtn").classList.remove("playing");
-    $("audioInfo").textContent = message || "Tap an ayah or press play";
+    $("audioInfo").textContent = message || "Tap play to listen";
   }
 
-  function firstVisibleKey() {
-    const w = document.querySelector(".spread .word");
-    return w && w.dataset.key;
-  }
+  const isShown = (key) => settings.mode === "verses"
+    ? !!$(cardId(key))
+    : !!document.querySelector(`.spread .word[data-key="${key}"]`);
 
   audio.addEventListener("ended", async () => {
     if (bismillahPending) {
@@ -382,14 +849,14 @@
       audio.play().catch(() => {});
       return;
     }
+    if (repeat) { audio.currentTime = 0; audio.play().catch(() => {}); return; }
     const nk = playingKey && nextVerseKey(playingKey);
     if (!nk) return stopAudio("Sadaqa Allahu al-'Azim");
-    if (document.querySelector(`.spread .word[data-key="${nk}"]`)) return playVerse(nk);
+    if (isShown(nk)) return playVerse(nk);
     if (!settings.autoAdvance) return stopAudio();
-    const last = visiblePages[visiblePages.length - 1];
-    if (last >= TOTAL_PAGES) return stopAudio();
     playingKey = nk;
-    await nextPage();
+    if (settings.mode === "verses") await openSurah(splitKey(nk)[0], null, false);
+    else await nextPage();
     playVerse(nk);
   });
   audio.addEventListener("pause", () => { if (!audio.ended) $("playBtn").classList.remove("playing"); });
@@ -398,44 +865,60 @@
 
   function togglePlay() {
     if (playingKey && !audio.paused) return audio.pause();
-    if (playingKey && audio.src && document.querySelector(`.spread .word[data-key="${playingKey}"]`)) return audio.play();
-    const k = firstVisibleKey();
+    if (playingKey && audio.src && isShown(playingKey)) return audio.play();
+    const k = settings.mode === "verses" ? topVisibleKey() : (document.querySelector(".spread .word[data-key]") || {}).dataset?.key;
     if (k) playVerse(k);
   }
 
-  // ---------- popover ----------
-  let popKey = null;
-  function cleanTranslation(html) {
-    const tpl = document.createElement("template");
-    tpl.innerHTML = html || "";
-    tpl.content.querySelectorAll("sup").forEach((s) => s.remove());
-    return tpl.content.textContent.trim();
-  }
-  function openPopover(key) {
-    popKey = key;
+  // ---------- ayah sheet ----------
+  let sheetKey = null;
+  async function openSheet(key) {
+    sheetKey = key;
+    const [s, a] = splitKey(key);
+    closePanels();
     document.querySelectorAll(".word.selected").forEach((w) => w.classList.remove("selected"));
     document.querySelectorAll(`.word[data-key="${key}"]`).forEach((w) => w.classList.add("selected"));
-    $("popKey").textContent = verseLabel(key);
-    $("popArabic").textContent = verseText.get(key) || "";
-    $("popTrans").textContent = "Loading translation…";
-    loadTranslations(pageForVerse(key)).then((verses) => {
-      if (popKey !== key) return;
+    $("sheetTitle").textContent = `${SURAHS[s - 1][1]}: ${a}`;
+    const ar = $("sheetArabic");
+    ar.textContent = verseText.get(key) || "";
+    fillVerseArabic(ar, key);
+    $("sheetTranslit").textContent = "";
+    $("sheetTrans").textContent = "Loading translation…";
+    updateSheetActions();
+    $("sheet").classList.add("open");
+    $("sheet").setAttribute("aria-hidden", "false");
+    $("scrim").classList.add("show");
+    if (settings.showTranslit) loadTranslit(s).then((l) => { if (sheetKey === key) $("sheetTranslit").textContent = l[a - 1] || ""; }, () => {});
+    loadSurahVerses(s).then((verses) => {
+      if (sheetKey !== key) return;
       const v = verses.get(key);
-      if (v && v.text_uthmani) $("popArabic").textContent = v.text_uthmani;
       const tr = v && v.translations && v.translations[0];
-      $("popTrans").textContent = tr ? cleanTranslation(tr.text) : "";
-    }, () => {
-      if (popKey === key) $("popTrans").textContent = "Translation unavailable right now.";
-    });
-    $("popBookmark").classList.toggle("active", bookmarks.some((b) => b.key === key));
-    $("popover").classList.add("open");
-    $("popover").setAttribute("aria-hidden", "false");
+      $("sheetTrans").textContent = tr ? cleanTranslation(tr.text) : "";
+    }, () => { if (sheetKey === key) $("sheetTrans").textContent = "Translation unavailable right now."; });
   }
-  function closePopover() {
-    popKey = null;
+  function updateSheetActions() {
+    if (!sheetKey) return;
+    const read = readSet.has(sheetKey);
+    $("actMark").classList.toggle("active", read);
+    $("actMarkLabel").textContent = read ? "Read" : "Mark read";
+    $("actBookmark").classList.toggle("active", bookmarks.some((b) => b.key === sheetKey));
+  }
+  function closeSheet() {
+    if (!sheetKey) return;
+    sheetKey = null;
     document.querySelectorAll(".word.selected").forEach((w) => w.classList.remove("selected"));
-    $("popover").classList.remove("open");
-    $("popover").setAttribute("aria-hidden", "true");
+    $("sheet").classList.remove("open");
+    $("sheet").setAttribute("aria-hidden", "true");
+    if (!anyPanelOpen()) $("scrim").classList.remove("show");
+  }
+  async function shareVerse(key) {
+    const url = `${location.origin}${location.pathname}#s${key}`;
+    const text = `${$("sheetTrans").textContent}\n— ${verseLabel(key)}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: verseLabel(key), text, url }); } catch { /* cancelled */ }
+      return;
+    }
+    try { await navigator.clipboard.writeText(`${text}\n${url}`); toast("Link copied"); } catch { toast("Couldn't share"); }
   }
 
   // ---------- bookmarks ----------
@@ -446,53 +929,67 @@
     const p = visiblePages[0];
     const i = bookmarks.findIndex((b) => !b.key && visiblePages.includes(b.page));
     if (i >= 0) { bookmarks.splice(i, 1); toast("Bookmark removed"); }
-    else { bookmarks.unshift({ page: p, time: Date.now() }); toast(`Page ${p} bookmarked`); }
+    else {
+      bookmarks.unshift({ page: p, time: Date.now() });
+      logActivity({ type: "bookmark", page: p });
+      toast(`Page ${p} bookmarked`);
+    }
     saveBookmarks();
     updateBookmarkBtn();
-    if (activeTab === "bookmarks") renderIndex();
   }
   function toggleAyahBookmark(key) {
     const i = bookmarks.findIndex((b) => b.key === key);
     if (i >= 0) { bookmarks.splice(i, 1); toast("Bookmark removed"); }
     else {
       bookmarks.unshift({ key, page: pageForVerse(key), time: Date.now() });
+      logActivity({ type: "bookmark", key });
       toast(`${verseLabel(key)} bookmarked`);
     }
     saveBookmarks();
-    $("popBookmark").classList.toggle("active", i < 0);
-    if (activeTab === "bookmarks") renderIndex();
+    const card = $(cardId(key));
+    if (card) card.querySelector(".bm").classList.toggle("active", i < 0);
+    updateSheetActions();
   }
 
   // ---------- panels ----------
   const panels = ["drawer", "searchPanel", "settingsPanel"];
-  function openPanel(id) {
+  function openPanel(id, tab) {
+    closeSheet();
     panels.forEach((p) => { $(p).classList.toggle("open", p === id); $(p).setAttribute("aria-hidden", p !== id); });
     $("scrim").classList.add("show");
-    closePopover();
-    if (id === "drawer") { renderIndex(); scrollIndexToCurrent(); }
+    if (id === "drawer") {
+      if (tab) selectTab(tab);
+      renderIndex();
+      scrollIndexToCurrent();
+    }
     if (id === "searchPanel") setTimeout(() => $("searchInput").focus(), 50);
   }
   function closePanels() {
     panels.forEach((p) => { $(p).classList.remove("open"); $(p).setAttribute("aria-hidden", "true"); });
-    $("scrim").classList.remove("show");
+    if (!sheetKey) $("scrim").classList.remove("show");
   }
   const anyPanelOpen = () => panels.some((p) => $(p).classList.contains("open"));
 
   // ---------- index (surah / juz / bookmarks) ----------
   let activeTab = "surahs";
-  function listItem({ num, name, sub, ar, current, onClick, onDelete }) {
+  function selectTab(tab) {
+    activeTab = tab;
+    document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("active", x.dataset.tab === tab));
+  }
+  function listItem({ num, name, sub, ar, extra, current, onClick, onDelete }) {
     const li = el("li");
     if (current) li.classList.add("current");
-    if (num != null) { const n = el("div", "num"); n.append(el("span", null, num)); li.append(n); }
+    if (num != null) li.append(el("span", "star accent", String(num)));
     const info = el("div", "info");
     info.append(el("div", "name", name));
     if (sub) info.append(el("div", "sub", sub));
     li.append(info);
+    if (extra) li.append(el("span", "done", extra));
     if (ar) li.append(el("div", "ar", ar));
     if (onDelete) {
       const del = el("button", "icon-btn del");
       del.setAttribute("aria-label", "Remove bookmark");
-      del.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+      del.innerHTML = ICONS.close;
       del.addEventListener("click", (e) => { e.stopPropagation(); onDelete(); });
       li.append(del);
     }
@@ -500,55 +997,74 @@
     return li;
   }
 
+  const go = (fn) => () => { closePanels(); fn(); };
+  const openSurahStart = (s) => (settings.mode === "verses" ? openSurah(s) : openMushaf(SURAHS[s - 1][4]));
+
+  function currentSurah() {
+    if (view !== "reader") return lastPos ? splitKey(resumeKey())[0] : 1;
+    return settings.mode === "verses" ? curSurah : surahForPage(visiblePages[0] || 1);
+  }
+
   function renderIndex() {
     const list = $("indexList");
     const filterBox = $("surahFilter");
     filterBox.hidden = activeTab !== "surahs";
     list.replaceChildren();
-    const curSurah = surahForPage(visiblePages[0] || currentPage);
+    const curS = currentSurah();
 
     if (activeTab === "surahs") {
       const q = filterBox.value.trim().toLowerCase();
       SURAHS.forEach((m, i) => {
         const hay = `${i + 1} ${m[0]} ${m[1]} ${m[2]}`.toLowerCase().replace(/['-]/g, "");
         if (q && !hay.includes(q.replace(/['-]/g, ""))) return;
+        let read = 0;
+        for (let a = 1; a <= m[3]; a++) if (readSet.has(`${i + 1}:${a}`)) read++;
         list.append(listItem({
-          num: i + 1, name: m[1], sub: `${m[2]} · ${m[3]} ayahs · ${m[5]} · p.${m[4]}`, ar: m[0],
-          current: i + 1 === curSurah,
-          onClick: () => { closePanels(); goTo(m[4]); },
+          num: i + 1, name: m[1], sub: `${m[2]} · ${m[3]} verses · ${m[5] === "Meccan" ? "Makkiyah" : "Madaniyah"}`, ar: m[0],
+          extra: read === m[3] ? "✓" : read ? `${Math.floor((read / m[3]) * 100)}%` : "",
+          current: i + 1 === curS,
+          onClick: go(() => openSurahStart(i + 1)),
         }));
       });
     } else if (activeTab === "juz") {
-      const curJuz = juzForPage(visiblePages[0] || currentPage);
+      const curJuz = juzOfIndex(verseIndex(view === "reader" && settings.mode === "mushaf" ? PAGE_FIRST_VERSE[(visiblePages[0] || 1) - 1] : resumeKey())) + 1;
       JUZ.forEach(([key, page], i) => {
         list.append(listItem({
-          num: i + 1, name: `Juz ${i + 1}`, sub: `Starts ${verseLabel(key)} · p.${page}`, ar: "الجزء " + arabicDigits(i + 1),
+          num: i + 1, name: `Juz ${i + 1}`, sub: `Starts ${verseLabel(key)} · page ${page}`, ar: "الجزء " + arabicDigits(i + 1),
           current: i + 1 === curJuz,
-          onClick: () => { closePanels(); goTo(page); },
+          onClick: go(() => (settings.mode === "verses" ? openSurah(...splitKey(key)) : openMushaf(page))),
         }));
       });
     } else {
-      const last = store.get("lastPage", null);
-      if (last) {
+      if (lastPos) {
+        const key = resumeKey();
         list.append(el("li", "list-section", "Last read"));
         list.append(listItem({
-          name: `Page ${last}`, sub: `${SURAHS[surahForPage(last) - 1][1]} · Juz ${juzForPage(last)}`,
-          onClick: () => { closePanels(); goTo(last); },
+          name: lastPos.mode === "mushaf" ? `Page ${lastPos.page}` : verseLabel(key),
+          sub: `${SURAHS[splitKey(key)[0] - 1][1]} · Juz ${juzOfIndex(verseIndex(key)) + 1}`,
+          onClick: go(resume),
         }));
       }
       list.append(el("li", "list-section", "Bookmarks"));
-      if (!bookmarks.length) list.append(el("li", "empty", "No bookmarks yet. Use the bookmark button or tap an ayah."));
+      if (!bookmarks.length) list.append(el("li", "empty", "No bookmarks yet. Bookmark a page, or tap an ayah and choose Bookmark."));
       bookmarks.forEach((b, i) => {
         const remove = () => { bookmarks.splice(i, 1); saveBookmarks(); updateBookmarkBtn(); renderIndex(); };
         list.append(b.key
-          ? listItem({ name: verseLabel(b.key), sub: `Ayah · page ${b.page}`, onClick: () => { closePanels(); goToVerse(b.key); }, onDelete: remove })
-          : listItem({ name: `Page ${b.page}`, sub: `${SURAHS[surahForPage(b.page) - 1][1]} · Juz ${juzForPage(b.page)}`, onClick: () => { closePanels(); goTo(b.page); }, onDelete: remove }));
+          ? listItem({ name: verseLabel(b.key), sub: `Ayah · page ${b.page}`, onClick: go(() => openVerse(b.key)), onDelete: remove })
+          : listItem({ name: `Page ${b.page}`, sub: `${SURAHS[surahForPage(b.page) - 1][1]} · Juz ${juzForPage(b.page)}`, onClick: go(() => openMushaf(b.page)), onDelete: remove }));
       });
     }
   }
   function scrollIndexToCurrent() {
     const cur = $("indexList").querySelector(".current");
     if (cur) cur.scrollIntoView({ block: "center" });
+  }
+
+  function resume() {
+    if (lastPos && lastPos.mode === "mushaf") return openMushaf(lastPos.page);
+    const [s, a] = splitKey(resumeKey());
+    if (settings.mode === "verses" || (lastPos && lastPos.mode === "verses")) return openSurah(s, a > 1 ? a : null);
+    return openMushaf(pageForVerse(`${s}:${a}`));
   }
 
   // ---------- search ----------
@@ -568,18 +1084,18 @@
     if (ref) {
       const s = +ref[1], a = +ref[2];
       if (s >= 1 && s <= 114 && a >= 1 && a <= SURAHS[s - 1][3]) {
-        out.push(listItem({ name: `Go to ${verseLabel(`${s}:${a}`)}`, sub: "Verse", onClick: () => { closePanels(); goToVerse(`${s}:${a}`); } }));
+        out.push(listItem({ name: `Go to ${verseLabel(`${s}:${a}`)}`, sub: "Verse", onClick: go(() => openVerse(`${s}:${a}`)) }));
       }
     } else if (/^\d+$/.test(q)) {
       const n = +q;
-      if (n >= 1 && n <= TOTAL_PAGES) out.push(listItem({ name: `Go to page ${n}`, sub: `Juz ${juzForPage(n)}`, onClick: () => { closePanels(); goTo(n); } }));
-      if (n >= 1 && n <= 114) out.push(listItem({ num: n, name: SURAHS[n - 1][1], sub: SURAHS[n - 1][2], ar: SURAHS[n - 1][0], onClick: () => { closePanels(); goTo(SURAHS[n - 1][4]); } }));
+      if (n >= 1 && n <= TOTAL_PAGES) out.push(listItem({ name: `Go to page ${n}`, sub: `Juz ${juzForPage(n)}`, onClick: go(() => openMushaf(n)) }));
+      if (n >= 1 && n <= 114) out.push(listItem({ num: n, name: SURAHS[n - 1][1], sub: SURAHS[n - 1][2], ar: SURAHS[n - 1][0], onClick: go(() => openSurahStart(n)) }));
     } else {
       const norm = (s) => s.toLowerCase().replace(/['-\s]/g, "");
       const nq = norm(q);
       SURAHS.forEach((m, i) => {
         if (nq.length >= 2 && (norm(m[1]).includes(nq) || norm(m[2]).includes(nq) || m[0].includes(q))) {
-          out.push(listItem({ num: i + 1, name: m[1], sub: m[2], ar: m[0], onClick: () => { closePanels(); goTo(m[4]); } }));
+          out.push(listItem({ num: i + 1, name: m[1], sub: m[2], ar: m[0], onClick: go(() => openSurahStart(i + 1)) }));
         }
       });
     }
@@ -616,7 +1132,7 @@
         if (arabic) snip.setAttribute("dir", "rtl");
         info.append(highlight(snip, m.text, q));
         li.append(info);
-        li.addEventListener("click", () => { closePanels(); goToVerse(key); });
+        li.addEventListener("click", go(() => openVerse(key)));
         list.append(li);
       });
     } catch {
@@ -626,10 +1142,15 @@
   }
 
   // ---------- settings ----------
+  function applyThemeColor() {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    const t = settings.theme;
+    if (view === "home") meta.content = t === "dark" ? "#1f3d2a" : t === "sepia" ? "#3f5e37" : "#2f5b3d";
+    else meta.content = t === "dark" ? "#171e1a" : t === "sepia" ? "#fbf6ec" : "#ffffff";
+  }
   function applyTheme() {
     document.documentElement.dataset.theme = settings.theme;
-    const meta = document.querySelector('meta[name="theme-color"]');
-    meta.content = settings.theme === "dark" ? "#182019" : settings.theme === "sepia" ? "#8a5a1e" : "#1f5f4a";
+    applyThemeColor();
   }
 
   function fillSelect(sel, options, value) {
@@ -651,30 +1172,48 @@
     } catch { /* keep built-in defaults */ }
   }
 
-  function initSettings() {
-    const scriptSel = el("select");
-    scriptSel.id = "scriptSel";
-    fillSelect(scriptSel, [["glyph", "Madani Mushaf (King Fahd Complex)"], ["text", "Uthmani text (Amiri)"]], settings.script);
-    const scriptLabel = el("label", null, "Script");
-    scriptLabel.append(scriptSel);
-    $("layoutSel").closest("label").after(scriptLabel);
+  // Redraw whatever is on screen after a display setting changes.
+  function refreshReader() {
+    if (view !== "reader") return;
+    if (settings.mode === "mushaf") render();
+    else {
+      const [s, a] = splitKey(topVisibleKey() || `${curSurah}:1`);
+      openSurah(s, a > 1 ? a : null, false);
+    }
+  }
 
+  function initSettings() {
     $("themeSel").value = settings.theme;
+    $("scriptSel").value = settings.script;
     $("layoutSel").value = settings.layout;
     $("autoAdvance").checked = settings.autoAdvance;
+    $("showTranslit").checked = settings.showTranslit;
     fillSelect($("reciterSel"), RECITERS, settings.reciter);
     fillSelect($("translationSel"), DEFAULT_TRANSLATIONS, settings.translation);
+    $("playerReciter").textContent = reciterName();
     loadTranslationList();
 
     $("themeSel").addEventListener("change", (e) => { settings.theme = e.target.value; saveSettings(); applyTheme(); });
-    $("layoutSel").addEventListener("change", (e) => { settings.layout = e.target.value; saveSettings(); render(); });
-    scriptSel.addEventListener("change", (e) => { settings.script = e.target.value; saveSettings(); render(); });
+    $("layoutSel").addEventListener("change", (e) => { settings.layout = e.target.value; saveSettings(); if (settings.mode === "mushaf") refreshReader(); });
+    $("scriptSel").addEventListener("change", (e) => { settings.script = e.target.value; saveSettings(); refreshReader(); });
     $("autoAdvance").addEventListener("change", (e) => { settings.autoAdvance = e.target.checked; saveSettings(); });
+    $("showTranslit").addEventListener("change", (e) => { settings.showTranslit = e.target.checked; saveSettings(); if (settings.mode === "verses") refreshReader(); });
     $("reciterSel").addEventListener("change", (e) => {
       settings.reciter = e.target.value; saveSettings();
+      $("playerReciter").textContent = reciterName();
       if (playingKey && !audio.paused) playVerse(playingKey);
     });
-    $("translationSel").addEventListener("change", (e) => { settings.translation = +e.target.value; saveSettings(); });
+    $("translationSel").addEventListener("change", (e) => { settings.translation = +e.target.value; saveSettings(); if (settings.mode === "verses") refreshReader(); });
+    $("resetKhatam").addEventListener("click", () => {
+      if (!confirm("Restart your khatam? Your read verses will be cleared. Bookmarks are kept.")) return;
+      readSet.clear();
+      khatam.start = null;
+      saveKhatam();
+      logActivity({ type: "khatam" });
+      closePanels();
+      if (view === "home") renderHome(); else refreshReader();
+      toast("Khatam restarted");
+    });
   }
 
   // ---------- misc ----------
@@ -688,30 +1227,41 @@
   }
 
   function bindEvents() {
-    $("menuBtn").addEventListener("click", () => openPanel("drawer"));
-    $("searchBtn").addEventListener("click", () => openPanel("searchPanel"));
-    $("settingsBtn").addEventListener("click", () => openPanel("settingsPanel"));
+    document.querySelectorAll("[data-open]").forEach((b) => b.addEventListener("click", () => openPanel(b.dataset.open)));
+    document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => { closePanels(); closeSheet(); }));
+    $("scrim").addEventListener("click", () => { closePanels(); closeSheet(); });
+
+    // Home
+    $("continueBtn").addEventListener("click", resume);
+    document.querySelectorAll(".tile").forEach((t) => t.addEventListener("click", () => {
+      const action = t.dataset.action;
+      if (action === "mushaf") openMushaf(lastPos && lastPos.page ? lastPos.page : pageForVerse(resumeKey()));
+      else if (action === "surahs") openPanel("drawer", "surahs");
+      else if (action === "bookmarks") openPanel("drawer", "bookmarks");
+      else if (action === "search") openPanel("searchPanel");
+    }));
+
+    // Reader chrome
+    $("backBtn").addEventListener("click", () => { stopAudio(); showHome(); });
+    $("modeBtn").addEventListener("click", switchMode);
     $("bookmarkBtn").addEventListener("click", togglePageBookmark);
+    $("markPageBtn").addEventListener("click", toggleMarkPage);
     $("nextBtn").addEventListener("click", nextPage);
     $("prevBtn").addEventListener("click", prevPage);
     $("playBtn").addEventListener("click", togglePlay);
-    $("scrim").addEventListener("click", closePanels);
-    document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => { closePanels(); closePopover(); }));
+    $("repeatBtn").addEventListener("click", () => {
+      repeat = !repeat;
+      $("repeatBtn").classList.toggle("active", repeat);
+      toast(repeat ? "Repeating this ayah" : "Repeat off");
+    });
+    $("reciterBtn").addEventListener("click", () => { openPanel("settingsPanel"); setTimeout(() => $("reciterSel").focus(), 260); });
 
     document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
-      activeTab = t.dataset.tab;
-      document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("active", x === t));
+      selectTab(t.dataset.tab);
       renderIndex();
       scrollIndexToCurrent();
     }));
     $("surahFilter").addEventListener("input", renderIndex);
-
-    $("gotoForm").addEventListener("submit", (e) => {
-      e.preventDefault();
-      const n = parseInt($("gotoInput").value, 10);
-      if (n) goTo(n);
-      $("gotoInput").blur();
-    });
 
     let searchTimer;
     $("searchInput").addEventListener("input", (e) => {
@@ -720,26 +1270,51 @@
     });
     $("searchForm").addEventListener("submit", (e) => { e.preventDefault(); clearTimeout(searchTimer); runSearch($("searchInput").value); });
 
-    // Word interactions: hover highlights the whole ayah, click opens it.
+    // Mushaf words: hover highlights the whole ayah, tap opens its sheet.
     const spread = $("spread");
     spread.addEventListener("mouseover", (e) => {
-      const w = e.target.closest(".word");
+      const w = e.target.closest(".word[data-key]");
       document.querySelectorAll(".word.hover").forEach((x) => x.classList.remove("hover"));
       if (w) document.querySelectorAll(`.word[data-key="${w.dataset.key}"]`).forEach((x) => x.classList.add("hover"));
     });
     spread.addEventListener("mouseleave", () => document.querySelectorAll(".word.hover").forEach((x) => x.classList.remove("hover")));
     spread.addEventListener("click", (e) => {
-      const w = e.target.closest(".word");
-      if (!w) return closePopover();
-      if (popKey === w.dataset.key) return closePopover();
-      openPopover(w.dataset.key);
+      const w = e.target.closest(".word[data-key]");
+      if (w) openSheet(w.dataset.key);
     });
 
-    $("popPlay").addEventListener("click", () => { if (popKey) playVerse(popKey); });
-    $("popBookmark").addEventListener("click", () => { if (popKey) toggleAyahBookmark(popKey); });
-    $("popCopy").addEventListener("click", async () => {
-      if (!popKey) return;
-      const text = `${$("popArabic").textContent}\n\n${$("popTrans").textContent}\n— ${verseLabel(popKey)}`;
+    // Verse cards
+    const verses = $("verses");
+    verses.addEventListener("scroll", onVersesScroll, { passive: true });
+    verses.addEventListener("click", (e) => {
+      const card = e.target.closest(".verse-card");
+      if (!card) return;
+      const key = card.dataset.key;
+      if (e.target.closest(".bm")) toggleAyahBookmark(key);
+      else if (e.target.closest(".more") || e.target.closest(".verse-ar")) openSheet(key);
+    });
+    verses.addEventListener("change", (e) => {
+      const card = e.target.closest(".verse-card");
+      if (card && e.target.matches(".mark input")) {
+        const read = toggleVerseRead(card.dataset.key);
+        e.target.checked = read;
+      }
+    });
+
+    // Sheet actions
+    $("actShare").addEventListener("click", () => { if (sheetKey) shareVerse(sheetKey); });
+    $("actPlay").addEventListener("click", () => { if (sheetKey) { const k = sheetKey; closeSheet(); playVerse(k); } });
+    $("actMark").addEventListener("click", () => {
+      if (!sheetKey) return;
+      toast(toggleVerseRead(sheetKey) ? `${verseLabel(sheetKey)} marked as read` : "Marked as unread");
+      updateSheetActions();
+    });
+    $("actBookmark").addEventListener("click", () => { if (sheetKey) toggleAyahBookmark(sheetKey); });
+    $("actCopy").addEventListener("click", async () => {
+      if (!sheetKey) return;
+      const v = (await loadSurahVerses(splitKey(sheetKey)[0]).catch(() => new Map())).get(sheetKey);
+      const arabic = (v && v.text_uthmani) || verseText.get(sheetKey) || "";
+      const text = `${arabic}\n\n${$("sheetTrans").textContent}\n— ${verseLabel(sheetKey)}`;
       try { await navigator.clipboard.writeText(text); toast("Copied"); } catch { toast("Copy failed"); }
     });
 
@@ -759,24 +1334,26 @@
         if (e.key === "Escape") e.target.blur();
         return;
       }
-      if (e.key === "Escape") { closePanels(); closePopover(); return; }
-      if (anyPanelOpen()) return;
-      if (e.key === "ArrowLeft") { e.preventDefault(); nextPage(); }
-      else if (e.key === "ArrowRight") { e.preventDefault(); prevPage(); }
+      if (e.key === "Escape") { closePanels(); closeSheet(); return; }
+      if (anyPanelOpen() || sheetKey || view !== "reader") {
+        if (e.key === "/" && !anyPanelOpen()) { e.preventDefault(); openPanel("searchPanel"); }
+        return;
+      }
+      const mushaf = settings.mode === "mushaf";
+      if (e.key === "ArrowLeft" && mushaf) { e.preventDefault(); nextPage(); }
+      else if (e.key === "ArrowRight" && mushaf) { e.preventDefault(); prevPage(); }
       else if (e.key === " ") { e.preventDefault(); togglePlay(); }
-      else if (e.key === "b" || e.key === "B") togglePageBookmark();
+      else if ((e.key === "b" || e.key === "B") && mushaf) togglePageBookmark();
       else if (e.key === "/") { e.preventDefault(); openPanel("searchPanel"); }
     });
 
-    window.addEventListener("hashchange", () => {
-      const p = parseInt(location.hash.slice(1), 10);
-      if (p && !visiblePages.includes(p)) goTo(p, { push: false });
-    });
+    window.addEventListener("popstate", applyRoute);
 
     let resizeTimer, wasDouble = isDouble();
     window.addEventListener("resize", () => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
+        if (view !== "reader" || settings.mode !== "mushaf") return;
         const d = isDouble();
         if (d !== wasDouble) { wasDouble = d; render(); } else sizePages();
       }, 120);
@@ -784,10 +1361,12 @@
   }
 
   // ---------- boot ----------
+  document.body.dataset.mode = settings.mode;
   applyTheme();
+  buildSurahTabs();
   initSettings();
   bindEvents();
-  goTo(currentPage);
+  applyRoute();
 
   if ("serviceWorker" in navigator && /^https:|^http:\/\/localhost/.test(location.href)) {
     navigator.serviceWorker.register("sw.js").catch(() => {});

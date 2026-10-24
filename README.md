@@ -4,22 +4,20 @@ A web app for reading the Quran page by page in the 604-page Madani Mushaf layou
 
 ## Features
 
-- **Mushaf page view:** pages use the King Fahd Complex Madinah Mushaf lettering (QCF4, 1441H). Each page has the same 15 lines as the printed copy, with ornate ayah markers, surah title banners, the basmala, juz and surah running heads, and page numbers. The text is scaled so every line fills the page width.
-- **Two-page spread:** on wide screens the right (odd) and left pages show side by side, like an open book. Phones show one page at a time.
-- **Navigation:**
-  - an index of all 114 surahs and 30 juz
-  - a box to go to a page
-  - left/right arrows
-  - keyboard shortcuts (`←`/`→`)
-  - swipe gestures
-  - shareable `#page` links
-- **Recitation:** ayah-by-ayah audio from 10 reciters. The playing ayah is highlighted, the basmala plays before each surah, and playback can continue to the next page.
-- **Tap an ayah:** shows its translation, with buttons to play from that ayah, bookmark it or copy it.
-- **Translations:** any translation on quran.com, chosen in Settings.
-- **Search:** English or Arabic text, surah names, page numbers, or verse references such as `2:255`.
-- **Bookmarks and last read:** saved locally in the browser.
-- **Themes:** Classic, Sepia and Night. Settings can also switch the page to plain Uthmani text in the Amiri font.
-- **Installable PWA:** pages you have opened stay available offline.
+- **Khatam home:**
+  - progress toward completing the Quran, shown as a percentage, juz completed and verses completed
+  - a Continue card that reopens the last reading position
+  - a weekly reading streak
+  - a log of recent activity
+- **Two reading modes**, switched with the ⇄ button:
+  - **Mushaf:** pages use the King Fahd Complex Madinah Mushaf lettering (QCF4, 1441H). Each page has the same 15 lines as the printed copy, with ornate ayah markers and surah banners, and the text is scaled so every line fills the page. On wide screens two pages show side by side like an open book.
+  - **Verse by verse:** scrollable surah tabs, then one card per ayah with the Mushaf lettering, transliteration, translation, a Mark checkbox and a bookmark button.
+- **Tracking what you've read:** tick verses as read, or mark a whole Mushaf page with the ✓ button. This feeds the khatam progress and the streak.
+- **Ayah sheet:** tap any ayah to share, play, mark as read, bookmark or copy it.
+- **Floating audio player:** 10 reciters, repeat-ayah, highlighting and auto-scroll for the ayah being recited, and the option to keep playing into the next page or surah.
+- **Navigation:** a surah, juz and bookmark index; search by English or Arabic text, surah name, page number or a reference such as `2:255`; swipe and keyboard page turns; shareable links (`#p6` opens page 6 and `#s2:255` opens a verse).
+- **Themes:** Light, Sepia and Night. Settings can also switch the script to plain Uthmani text in the Amiri font.
+- **Installable PWA:** pages and surahs you have opened stay available offline. Progress, bookmarks and settings are saved in the browser.
 
 ## Running locally
 
@@ -54,6 +52,6 @@ The QCF4 Mushaf fonts are © King Fahd Glorious Qur'an Printing Complex and are 
 
 - `index.html` – page structure
 - `styles.css` – layout and themes
-- `app.js` – rendering, navigation, audio, search, bookmarks, settings
+- `app.js` – khatam tracking, Mushaf and verse-by-verse rendering, audio, search, bookmarks, settings
 - `data.js` – surah, juz and reciter metadata
 - `sw.js`, `manifest.webmanifest`, `icon.svg` – PWA support
