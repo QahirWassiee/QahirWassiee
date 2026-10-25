@@ -1,7 +1,7 @@
 // Offline support: app shell is cached up front; Quran page data and fonts are
 // cached as they are read so previously opened pages work without a connection.
-const SHELL = "mushaf-shell-v4";
-const DATA = "mushaf-data-v4";
+const SHELL = "mushaf-shell-v5";
+const DATA = "mushaf-data-v5";
 const SHELL_FILES = ["./", "index.html", "styles.css", "app.js", "data.js", "manifest.webmanifest", "icon.svg"];
 
 self.addEventListener("install", (e) => {

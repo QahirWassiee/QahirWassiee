@@ -1213,9 +1213,9 @@
     const meta = document.querySelector('meta[name="theme-color"]');
     const t = settings.theme;
     const reader = view === "reader";
-    meta.content = t === "dark" ? (reader ? "#171e1a" : "#0f1412")
-      : t === "sepia" ? (reader ? "#fbf6ec" : "#eee6d6")
-        : (reader ? "#ffffff" : "#f2f4f7");
+    meta.content = t === "dark" ? (reader ? "#151A16" : "#0C100D")
+      : t === "sepia" ? (reader ? "#F6F2E4" : "#ECE6D3")
+        : (reader ? "#FBF9F2" : "#F6F3E7");
   }
   function applyTheme() {
     document.documentElement.dataset.theme = settings.theme;
