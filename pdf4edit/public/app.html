@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Editor – PDF 4 Edit</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/styles.css">
+<link rel="stylesheet" href="/css/editor.css">
+</head>
+<body class="editor">
+<header class="ed-head">
+  <a class="logo" href="/" aria-label="PDF 4 Edit home"><img class="mark" src="/favicon.svg" alt=""><span class="word">PDF<span class="four">4</span>Edit</span></a>
+  <div class="doc-name" id="doc-name" hidden></div>
+  <div class="head-actions">
+    <div class="menu" id="export-menu" hidden>
+      <button class="btn primary" id="export-btn" aria-haspopup="true" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        <span>Download</span>
+      </button>
+      <div class="menu-list" role="menu">
+        <button role="menuitem" data-export="pdf"><b>PDF</b><span>Your edited document, layout unchanged</span></button>
+        <button role="menuitem" data-export="docx"><b>Word (.docx)</b><span>Every line becomes editable text in Word</span></button>
+        <button role="menuitem" data-export="fillable"><b>Editable PDF</b><span>Fillable fields that open in any PDF reader</span></button>
+      </div>
+    </div>
+    <div class="menu" id="account-menu">
+      <button class="btn ghost" id="account-btn" aria-haspopup="true" aria-expanded="false">Sign in</button>
+      <div class="menu-list" role="menu" id="account-list"></div>
+    </div>
+  </div>
+</header>
+
+<div class="toolbar" id="toolbar" hidden>
+  <div class="tools" role="radiogroup" aria-label="Tool">
+    <button class="tool active" data-tool="edit" role="radio" aria-checked="true" title="Click any text to edit it">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span>Edit text</span>
+    </button>
+    <button class="tool" data-tool="add" role="radio" aria-checked="false" title="Click on the page to add text">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg><span>Add text</span>
+    </button>
+    <button class="tool" data-tool="erase" role="radio" aria-checked="false" title="Drag over an area to erase it">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4-4L15 5l4 4L7 21z"/><path d="M22 21H7"/></svg><span>Erase</span>
+    </button>
+  </div>
+  <div class="format" id="format" aria-label="Text format">
+    <select id="f-family" title="Font">
+      <option value="Helvetica">Sans (Helvetica/Arial)</option>
+      <option value="Times">Serif (Times)</option>
+      <option value="Courier">Mono (Courier)</option>
+    </select>
+    <button class="fbtn" id="f-bold" title="Bold"><b>B</b></button>
+    <button class="fbtn" id="f-italic" title="Italic"><i>I</i></button>
+    <button class="fbtn" id="f-smaller" title="Smaller">A−</button>
+    <span class="fsize" id="f-size">–</span>
+    <button class="fbtn" id="f-bigger" title="Larger">A+</button>
+    <label class="fbtn color" title="Text colour"><input type="color" id="f-color"><span></span></label>
+    <button class="fbtn" id="f-align" title="Anchor: keep the left or right edge fixed when the text gets longer">⇤</button>
+    <button class="fbtn" id="f-revert" title="Undo changes to this text">Revert</button>
+    <button class="fbtn danger" id="f-delete" title="Delete">Delete</button>
+  </div>
+  <div class="tb-right">
+    <button class="fbtn" id="zoom-out" title="Zoom out">−</button>
+    <span class="fsize" id="zoom-level">100%</span>
+    <button class="fbtn" id="zoom-in" title="Zoom in">+</button>
+    <button class="fbtn" id="close-doc" title="Close this document">Close</button>
+  </div>
+</div>
+
+<main id="main">
+  <section class="drop" id="drop">
+    <div class="drop-inner">
+      <div class="drop-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 18v-6M9 15l3-3 3 3"/></svg></div>
+      <h1>Drop a PDF here to start editing</h1>
+      <p>Letters, offers, proposals, statements, forms. Anything that's a PDF.</p>
+      <label class="btn primary big">Choose a PDF<input type="file" id="file" accept="application/pdf,.pdf" hidden></label>
+      <p class="fine">Your file opens in your browser. Nothing is uploaded while you edit.</p>
+      <div class="resume" id="resume" hidden>
+        <span>Continue editing <b id="resume-name"></b>?</span>
+        <button class="btn" id="resume-btn">Continue</button>
+        <button class="btn ghost" id="resume-discard">Discard</button>
+      </div>
+    </div>
+  </section>
+  <div class="pages" id="pages" hidden></div>
+</main>
+
+<div class="busy" id="busy" hidden><div class="spinner"></div><span id="busy-text">Working…</span></div>
+
+<script type="module" src="/js/editor.js"></script>
+</body>
+</html>

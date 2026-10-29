@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF 4 Edit – Edit any PDF without breaking the layout</title>
+<meta name="description" content="Upload a PDF, click any word or number and change it. Nothing moves. Export to PDF, Word or a fillable PDF. Unlimited use for $4.99/month.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+<header class="site-head">
+  <div class="wrap">
+    <a class="logo" href="/" aria-label="PDF 4 Edit home"><img class="mark" src="/favicon.svg" alt="">PDF<span class="four">4</span>Edit</a>
+    <nav>
+      <a class="link" href="#how">How it works</a>
+      <a class="link" href="#pricing">Pricing</a>
+      <a class="link" href="#faq">FAQ</a>
+      <a class="btn ghost" href="#" id="nav-account">Sign in</a>
+      <a class="btn primary" href="/app.html">Open editor</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <span class="eyebrow">Pixel-perfect PDF editing</span>
+      <h1>Edit every word in your PDF. <em>Nothing else moves.</em></h1>
+      <p class="lead">Upload any PDF, from letters and job offers to proposals and statements. Click any sentence, word or number and type. The layout, spacing and every figure you don't touch stay exactly where they were.</p>
+      <div class="cta">
+        <a class="btn primary big" href="/app.html">Upload a PDF to edit</a>
+        <a class="btn big" href="#pricing">See pricing</a>
+      </div>
+      <p class="fine">Try the editor free. Downloads are unlimited for $4.99/month.</p>
+
+      <div class="demo" aria-hidden="true">
+        <div class="demo-bar"><i></i><i></i><i></i></div>
+        <div class="statement">
+          <div class="top">
+            <div><div class="bank">Brightline Studio</div>Invoice #1042 · March 2026</div>
+            <div style="text-align:right">Billed to<br>Harbor &amp; Pine Ltd.</div>
+          </div>
+          <table>
+            <thead><tr><th>Date</th><th>Description</th><th>Hours</th><th>Amount</th></tr></thead>
+            <tbody>
+              <tr><td>03/02</td><td>Discovery workshop</td><td>6</td><td>720.00</td></tr>
+              <tr><td>03/06</td><td>Wireframes, round 1</td><td>14</td><td>1,680.00</td></tr>
+              <tr><td>03/11</td><td><span class="editing" id="demo-edit">Brand guidelines</span><span class="caret"></span></td><td>9</td><td>1,080.00</td></tr>
+              <tr><td>03/18</td><td>Client review call</td><td>2</td><td>240.00</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="features">
+    <div class="wrap">
+      <h2>Built so your document never shifts</h2>
+      <p class="sub">Most PDF editors rebuild the page when they open it, and that's what makes text jump around. PDF 4 Edit leaves your original page exactly as it is and changes only the words you edit.</p>
+      <div class="grid">
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></div>
+          <h3>Edit any text</h3>
+          <p>Every sentence, word and number is clickable. Type over it and the new text sits on the same baseline, at the same size, in a matching font.</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+          <h3>Layout locked in place</h3>
+          <p>Tables, columns, logos and lines are never re-flowed. Numbers in right-aligned columns stay right-aligned when you change them.</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg></div>
+          <h3>PDF, Word or fillable PDF</h3>
+          <p>Download the edited PDF, convert it to a Word document with every line editable, or export a fillable PDF that opens in any reader.</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></div>
+          <h3>Add new text</h3>
+          <p>Drop new text anywhere on the page, then choose its size, weight and colour to match the rest of the document.</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4-4L15 5l4 4L7 21z"/><path d="M22 21H7"/></svg></div>
+          <h3>Erase anything</h3>
+          <p>Drag over a stamp, a line or a scanned area to remove it. The eraser matches the paper colour around it.</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+          <h3>Private by design</h3>
+          <p>Your file opens and is edited in your own browser. When you download, it's processed in memory and never stored on our servers.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="how" style="background:#fff;border-block:1px solid var(--line)">
+    <div class="wrap">
+      <h2>Three steps, no surprises</h2>
+      <p class="sub">There's nothing to install and nothing to learn.</p>
+      <div class="grid steps">
+        <div class="card"><h3>Upload</h3><p>Drop in any PDF. It appears exactly as it looks in your PDF reader.</p></div>
+        <div class="card"><h3>Click &amp; type</h3><p>Click the text you want to change and type. Press Tab to jump to the next piece of text.</p></div>
+        <div class="card"><h3>Download</h3><p>Save it as a PDF, a Word document or a fillable PDF, as many times as you need.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="pricing">
+    <div class="wrap">
+      <h2>One simple price</h2>
+      <p class="sub">Everything included, no per-file fees and no limits.</p>
+      <div class="price-card">
+        <strong>PDF 4 Edit Unlimited</strong>
+        <div class="amount">$4.99<small> / month</small></div>
+        <div style="color:var(--ink-3)">Cancel anytime</div>
+        <ul>
+          <li>Unlimited PDF uploads and edits</li>
+          <li>Unlimited PDF, Word and fillable PDF downloads</li>
+          <li>Edit every word, number and sentence</li>
+          <li>Original layout preserved exactly</li>
+          <li>Files up to 50 MB, any number of pages</li>
+        </ul>
+        <button class="btn primary big" id="buy">Get unlimited access</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="faq" style="padding-top:0">
+    <div class="wrap">
+      <h2>Questions</h2>
+      <div class="faq" style="margin-top:28px">
+        <details><summary>Will editing move the rest of my document?</summary><p>No. Your original page stays exactly as it is. Only the text you change is replaced, at the same position and size. Everything else, including every figure you don't touch, stays the same.</p></details>
+        <details><summary>Can I try it before paying?</summary><p>Yes. Upload a PDF and make all the edits you like for free. You only need a subscription to download.</p></details>
+        <details><summary>What if my PDF is a scan or a photo?</summary><p>Scanned pages are images, so there's no text to click. Use the Erase tool to remove what you want to change, then Add text to type the replacement.</p></details>
+        <details><summary>How does the Word conversion work?</summary><p>Each page becomes a Word page with your graphics kept in the background and every line of text as editable text, positioned where it was in the PDF.</p></details>
+        <details><summary>How do I cancel?</summary><p>Open the editor, click your account and choose Manage billing. You can cancel in one click and you keep access until the end of the period you've paid for.</p></details>
+        <details><summary>Are there any rules on what I can edit?</summary><p>Use PDF 4 Edit for documents you're entitled to change. Altering bank statements, pay slips, IDs or official letters to mislead someone is fraud, and it isn't allowed under our <a href="/terms.html">terms</a>.</p></details>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <span>© <span id="year"></span> PDF 4 Edit</span>
+    <span><a href="/terms.html">Terms</a><a href="/privacy.html">Privacy</a><a href="/app.html">Editor</a></span>
+  </div>
+</footer>
+
+<script type="module">
+import { me, signIn, subscribe, signOut } from '/js/common.js';
+document.getElementById('year').textContent = new Date().getFullYear();
+const head = document.querySelector('.site-head');
+addEventListener('scroll', () => head.classList.toggle('scrolled', scrollY > 4), { passive: true });
+
+const nav = document.getElementById('nav-account');
+async function refresh() {
+  const { user } = await me(true);
+  nav.textContent = user ? 'Sign out' : 'Sign in';
+}
+nav.addEventListener('click', async (e) => {
+  e.preventDefault();
+  const { user } = await me();
+  if (user) await signOut(); else await signIn('login');
+  refresh();
+});
+document.getElementById('buy').addEventListener('click', async () => {
+  if (await subscribe()) location.href = '/app.html';
+  refresh();
+});
+refresh();
+
+// Little animation for the demo statement.
+const target = document.getElementById('demo-edit');
+const words = ['Brand guidelines', 'Brand guidelines and logo files', 'Brand identity system'];
+let w = 0;
+setInterval(() => { w = (w + 1) % words.length; target.textContent = words[w]; }, 2600);
+</script>
+</body>
+</html>

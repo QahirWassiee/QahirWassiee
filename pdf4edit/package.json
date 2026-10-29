@@ -1,0 +1,26 @@
+{
+  "name": "pdf4edit",
+  "version": "1.0.0",
+  "description": "PDF 4 Edit: edit any PDF without changing its layout",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@cantoo/pdf-lib": "^2.11.1",
+    "cookie-parser": "^1.4.7",
+    "docx": "^9.15.0",
+    "express": "^5.3.0",
+    "multer": "^2.5.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^4.10.38",
+    "stripe": "^23.0.1"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=22.13"
+  }
+}
